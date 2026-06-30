@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="author" content="Christian - Spazio Ireos">
+<meta name="description" content="Calendario occupazioni aule CDQ - Spazio Ireos soc. coop. sociale ETS">
+<title>Calendario occupazioni CDQ - Spazio Ireos</title>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<style>
+  :root{
+    --bg:#FAFAF7; --surface:#FFFFFF; --ink:#1F2430; --muted:#6B7280;
+    --hair:#E5E3DC; --hair-strong:#CFCCC2; --accent:#C0392B; --accent-ink:#8E2A20;
+    --shadow:0 1px 2px rgba(31,36,48,.06),0 6px 18px rgba(31,36,48,.06);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-size:14px;line-height:1.4;-webkit-text-size-adjust:100%}
+  .wrap{max-width:1320px;margin:0 auto;padding:14px 14px 64px}
+
+  header.app{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;
+    border-bottom:2px solid var(--accent);padding-bottom:10px;margin-bottom:12px}
+  header.app h1{font-size:18px;margin:0;font-weight:700;letter-spacing:-.01em;display:flex;align-items:center;gap:8px}
+  header.app h1 .b{color:var(--accent-ink)}
+  .sededot{width:13px;height:13px;border-radius:4px;border:1px solid rgba(0,0,0,.18);display:inline-block}
+  .grow{flex:1 1 auto}
+  .who{font-size:12px;color:var(--muted);text-align:right;line-height:1.3}
+  .badge{display:inline-block;font-size:11px;font-weight:700;padding:2px 7px;border-radius:999px;background:#EEF1F4;color:#334155;margin-left:6px}
+  .badge.admin{background:#FDECEA;color:#8E2A20}.badge.editor{background:#E9F8EE;color:#15803D}
+  .badge.viewer{background:#EAF1FE;color:#1D4ED8}.badge.demo{background:#FFF4D6;color:#92660A}
+
+  .btn{appearance:none;border:1px solid var(--hair-strong);background:var(--surface);color:var(--ink);
+    font:inherit;font-size:13px;padding:7px 12px;border-radius:8px;cursor:pointer;line-height:1;white-space:nowrap}
+  .btn:hover{border-color:var(--ink)}.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn.ghost{background:transparent}.btn.danger{color:var(--accent-ink);border-color:#E2B7B2}
+  .btn.sm{padding:5px 9px;font-size:12px}
+
+  .nav{display:flex;gap:6px;margin-bottom:12px}
+  .nav .seg{border:1px solid var(--hair-strong);background:#fff;border-radius:8px;padding:8px 14px;font-size:13.5px;cursor:pointer;font-weight:600}
+  .nav .seg[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+
+  .panel{background:var(--surface);border:1px solid var(--hair);border-radius:12px;box-shadow:var(--shadow);padding:10px 12px;margin-bottom:12px}
+  .filters{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:flex-end}
+  .fc{display:flex;flex-direction:column;gap:4px}
+  .fc label{font-size:11px;color:var(--muted)}
+  .fc select,.fc input{font:inherit;font-size:13px;padding:7px 9px;border:1px solid var(--hair-strong);border-radius:8px;background:#fff;color:var(--ink);min-width:120px}
+  .fc input.search{min-width:170px}
+  .sedeline{display:flex;align-items:center;gap:7px}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{border:1px solid var(--hair-strong);background:#fff;border-radius:999px;padding:5px 10px;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;user-select:none}
+  .chip .sw{width:11px;height:11px;border-radius:3px;border:1px solid rgba(0,0,0,.12)}
+  .chip[aria-pressed="true"]{border-color:var(--ink);font-weight:600;background:#F3F1EB}
+
+  .views{display:flex;gap:6px;flex-wrap:wrap}
+  .seg{border:1px solid var(--hair-strong);background:#fff;border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer}
+  .seg[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff;font-weight:600}
+
+  .days{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 10px}
+  .day-tab{border:1px solid var(--hair-strong);background:#fff;border-radius:999px;padding:7px 12px;font-size:13px;cursor:pointer}
+  .day-tab[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff;font-weight:600}
+
+  .legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin:8px 0 0;font-size:12px;color:var(--muted)}
+  .legend .it{display:inline-flex;align-items:center;gap:6px}
+  .legend .sw{width:12px;height:12px;border-radius:3px;border:1px solid rgba(0,0,0,.12)}
+  .legend .frm{width:14px;height:12px;border-radius:3px;background:#fff}
+
+  .grid-card{background:var(--surface);border:1px solid var(--hair);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
+  .grid-scroll{overflow:auto;max-height:72vh}
+  table{border-collapse:separate;border-spacing:0;width:100%;min-width:100%}
+  th,td{border-right:1px solid var(--hair);border-bottom:1px solid var(--hair);text-align:left;vertical-align:top}
+  thead th{position:sticky;top:0;z-index:5;background:#F3F1EB;color:var(--ink);font-weight:600;font-size:12px;padding:8px;border-bottom:2px solid var(--hair-strong)}
+  thead th.th0{left:0;z-index:6}
+  .time-col{position:sticky;left:0;z-index:4;background:#F7F5EF;color:var(--muted);font-variant-numeric:tabular-nums;font-size:11px;white-space:nowrap;padding:0 8px;width:62px;min-width:62px}
+  tbody tr{height:22px}
+  tbody td.time-col{height:22px;line-height:22px}
+  tr.hour td{border-top:1px solid var(--hair-strong)}
+  tr.hour td.time-col{color:var(--ink);font-weight:600;font-size:12px}
+  td.cell{padding:0;min-width:118px}
+  td.cell.empty.editable{cursor:pointer}
+  td.cell.empty.editable:hover{background:#FBF7F0}
+  td.block{padding:4px 6px;overflow:hidden;border-left:3px solid #888}
+  td.block.clk{cursor:pointer}
+  td.block .act{font-weight:600;font-size:12px;line-height:1.25;overflow:hidden;text-overflow:ellipsis}
+  td.block .meta{font-size:10.5px;color:var(--muted);margin-top:1px;font-variant-numeric:tabular-nums}
+  td.block .tp{font-size:10.5px;font-weight:600}
+  td.block.dim{opacity:.28;filter:grayscale(.4)}
+
+  table.list{min-width:700px}
+  table.list th,table.list td{padding:8px 10px;font-size:13px}
+  table.list tbody tr{height:auto;cursor:pointer}
+  table.list tbody tr:hover{background:#FBF7F0}
+  .sedepill{display:inline-flex;align-items:center;gap:6px;font-weight:600}
+  .sedepill .d{width:11px;height:11px;border-radius:3px;border:1px solid rgba(0,0,0,.15)}
+  .pill{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;border-left:3px solid #888}
+  .muted{color:var(--muted)}
+  .empty-state{padding:34px 16px;text-align:center;color:var(--muted)}
+
+  /* Home */
+  .home-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+  .seg-card{background:var(--surface);border:1px solid var(--hair);border-radius:12px;box-shadow:var(--shadow);padding:12px;border-top:4px solid #888}
+  .seg-card h3{margin:0 0 8px;font-size:15px;display:flex;align-items:center;gap:8px}
+  .seg-row{display:flex;justify-content:space-between;gap:8px;font-size:13px;padding:5px 0;border-bottom:1px dashed var(--hair)}
+  .seg-row:last-child{border-bottom:none}
+  .seg-empty{color:var(--muted);font-size:13px;padding:6px 0}
+  .seg-card .acts{margin-top:10px}
+
+  .ovl{position:fixed;inset:0;background:rgba(31,36,48,.45);display:none;align-items:center;justify-content:center;padding:16px;z-index:50}
+  .ovl.open{display:flex}
+  .modal{background:var(--surface);border-radius:14px;width:100%;max-width:480px;box-shadow:0 10px 40px rgba(0,0,0,.25);padding:18px;max-height:92vh;overflow:auto}
+  .modal h2{margin:0 0 12px;font-size:16px}
+  .field{margin-bottom:12px}
+  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+  .field input,.field select{width:100%;font:inherit;font-size:14px;padding:9px 10px;border:1px solid var(--hair-strong);border-radius:8px;background:#fff;color:var(--ink)}
+  .row2{display:flex;gap:10px}.row2 .field{flex:1}
+  .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:6px;flex-wrap:wrap;align-items:center}
+  .err{color:var(--accent-ink);font-size:12px;margin:-2px 0 8px;min-height:14px}
+  .rolerow{display:flex;gap:8px;align-items:center;justify-content:space-between;border-bottom:1px solid var(--hair);padding:7px 0;font-size:13px}
+
+  .login{max-width:440px;margin:8vh auto 0;background:var(--surface);border:1px solid var(--hair);border-radius:16px;box-shadow:var(--shadow);padding:26px;text-align:center}
+  .login h1{font-size:20px;margin:0 0 4px}
+  .login p{color:var(--muted);margin:6px 0 18px;font-size:13.5px}
+  .gbtn{display:inline-flex;align-items:center;gap:10px;border:1px solid var(--hair-strong);background:#fff;border-radius:10px;padding:11px 16px;font-size:14px;font-weight:600;cursor:pointer}
+  .gbtn:hover{border-color:var(--ink)}
+
+  footer.app{margin-top:18px;font-size:11px;color:var(--muted);text-align:center}
+  .banner{background:#FFF8E6;border:1px solid #F2E2B0;color:#7A5B00;border-radius:10px;padding:8px 12px;font-size:12.5px;margin-bottom:12px}
+
+  @media (max-width:640px){ header.app h1{font-size:16px} td.cell{min-width:104px} }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/jsx-source" id="appsrc">
+const { useState, useEffect, useMemo, useRef } = React;
+
+/* ===================== CONFIG (DA COMPILARE PER ANDARE ONLINE) ===================== */
+const FIREBASE_CONFIG = {
+  apiKey: "INCOLLA_API_KEY",
+  authDomain: "INCOLLA_AUTH_DOMAIN",
+  projectId: "INCOLLA_PROJECT_ID",
+  storageBucket: "INCOLLA_STORAGE_BUCKET",
+  messagingSenderId: "INCOLLA_SENDER_ID",
+  appId: "INCOLLA_APP_ID"
+};
+const ADMIN_EMAILS = ["christianmnop@gmail.com", "spazioireos@gmail.com"];
+/* ================================================================================== */
+
+const SEDI = {
+  "Garibaldi":  ["Aula Mansardina 1P","Salone PT","Aula E 2P","Ludoteca 3P","Saletta A 2P","Saletta C 2P","Saletta B 2P"],
+  "Gabelle":    ["Atrio PT","Giocoteca PT","Aula Pianoforte PT","Palestra PT"],
+  "Vigentina":  ["Salone 1P","Saletta A 1P","Aula B 1P","Aula Informatica PT"],
+  "Scaldasole": ["Salone PT","Saletta PT"]
+};
+const SEDE_NAMES = Object.keys(SEDI);
+const SEDE_COLORS = { "Garibaldi":"#4CAF50", "Gabelle":"#FFA000", "Vigentina":"#FFEB3B", "Scaldasole":"#0288D1" };
+const sedeColor = s => SEDE_COLORS[s] || "#888888";
+
+const TYPES = [
+  { key:"corso",   label:"Corso",                           color:"#FF7043" },
+  { key:"altra",   label:"Altra attivit\u00E0 strutturata",  color:"#F48FB1" },
+  { key:"libera",  label:"Libera aggr./autogest.",           color:"#B39DDB" },
+  { key:"esterni", label:"Attivit\u00E0 strutturata esterni",color:"#E6EE9C" }
+];
+const typeOf = k => { for(let i=0;i<TYPES.length;i++){ if(TYPES[i].key===k) return TYPES[i]; } return TYPES[0]; };
+
+const DAYS = ["Luned\u00EC","Marted\u00EC","Mercoled\u00EC","Gioved\u00EC","Venerd\u00EC","Sabato","Domenica"];
+const DAYS_SH = ["Lun","Mar","Mer","Gio","Ven","Sab","Dom"];
+const START_MIN = 8*60, SLOTS = (24-8)*4;
+const pad = n => (n<10?"0":"")+n;
+const slotToTime = i => { const m=START_MIN+i*15; return pad(Math.floor(m/60))+":"+pad(m%60); };
+function durLabel(q){ const m=q*15,h=Math.floor(m/60),mm=m%60;
+  if(h===0) return mm+" min"; if(mm===0) return h+(h===1?" ora":" ore"); return h+(h===1?" ora ":" ore ")+mm+" min"; }
+function hexToRgba(hex,a){ let h=hex.replace("#","");
+  const r=parseInt(h.substring(0,2),16),g=parseInt(h.substring(2,4),16),b=parseInt(h.substring(4,6),16);
+  return "rgba("+r+","+g+","+b+","+a+")"; }
+const SEG_BORDER = 3; // cornice segreteria, spessore medio
+
+const HAS_FB = (typeof firebase !== "undefined");
+const MODE = (HAS_FB && FIREBASE_CONFIG.apiKey.indexOf("INCOLLA")<0) ? "live" : "demo";
+let db=null, auth=null;
+if(MODE==="live"){
+  try{ firebase.initializeApp(FIREBASE_CONFIG); db=firebase.firestore(); auth=firebase.auth(); }
+  catch(e){ console.error("Init Firebase fallita:",e); }
+}
+const DEMO_OCC="demo_calendarioCDQ_v2", DEMO_SEG="demo_segreteria_v2";
+function lsLoad(k){ try{ const r=localStorage.getItem(k); if(r) return JSON.parse(r); }catch(e){} return null; }
+function lsSave(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+function demoSeedOcc(){ return [
+  {id:"d1",sede:"Garibaldi",room:"Salone PT",day:0,start:4,end:8,att:"Corso di spagnolo",tipo:"corso"},
+  {id:"d2",sede:"Garibaldi",room:"Aula E 2P",day:0,start:6,end:14,att:"Corso di italiano",tipo:"corso"},
+  {id:"d3",sede:"Garibaldi",room:"Ludoteca 3P",day:2,start:32,end:40,att:"Spazio gioco 0-3",tipo:"altra"},
+  {id:"d4",sede:"Garibaldi",room:"Saletta C 2P",day:0,start:28,end:36,att:"Gruppo anziani",tipo:"libera"},
+  {id:"d5",sede:"Garibaldi",room:"Aula Mansardina 1P",day:4,start:48,end:60,att:"Affitto sala (esterni)",tipo:"esterni"},
+  {id:"d6",sede:"Gabelle",room:"Palestra PT",day:1,start:40,end:46,att:"Corso di spagnolo",tipo:"corso"},
+  {id:"d7",sede:"Vigentina",room:"Salone 1P",day:3,start:8,end:12,att:"Riunione di rete",tipo:"altra"}
+];}
+function demoSeedSeg(){ return {
+  "Garibaldi":[ {day:0,start:4,end:20},{day:1,start:4,end:20},{day:2,start:4,end:20},{day:3,start:4,end:20},{day:4,start:4,end:20} ],
+  "Gabelle":[ {day:1,start:40,end:48} ],
+  "Vigentina":[], "Scaldasole":[]
+};}
+
+/* =================================================================== */
+function App(){
+  const [user,setUser]=useState(null);
+  const [role,setRole]=useState(null);
+  const [authReady,setAuthReady]=useState(MODE==="demo");
+  const [occ,setOcc]=useState([]);
+  const [seg,setSeg]=useState({});
+
+  const [page,setPage]=useState("home");   // home | cal
+  const [view,setView]=useState("giorno");
+  const [sede,setSede]=useState("Garibaldi");
+  const [aula,setAula]=useState("Tutte");
+  const [tipoSet,setTipoSet]=useState([]);
+  const [q,setQ]=useState("");
+  const [day,setDay]=useState(0);
+  const [giornoF,setGiornoF]=useState("tutti");
+
+  const [editing,setEditing]=useState(null);
+  const [mErr,setMErr]=useState("");
+  const [showRoles,setShowRoles]=useState(false);
+  const [rolesList,setRolesList]=useState([]);
+  const [newEmail,setNewEmail]=useState(""); const [newRole,setNewRole]=useState("viewer");
+  const [segEdit,setSegEdit]=useState(null); // sede in modifica segreteria
+
+  const canEdit = role==="admin" || role==="editor";
+  const isAdmin = role==="admin";
+
+  /* auth */
+  useEffect(()=>{
+    if(MODE==="demo"){ setUser({email:"anteprima@spazioireos",displayName:"Anteprima (demo)"}); setRole("admin"); return; }
+    if(!auth){ setAuthReady(true); return; }
+    const unsub=auth.onAuthStateChanged(u=>{ setUser(u); setAuthReady(true);
+      if(u){ resolveRole(u.email); } else { setRole(null); } });
+    return ()=>unsub();
+  },[]);
+  function resolveRole(email){
+    const lower=(email||"").toLowerCase();
+    if(ADMIN_EMAILS.indexOf(lower)>=0){ setRole("admin"); try{ db.collection("roles").doc(lower).set({role:"admin",email:lower},{merge:true}); }catch(e){} return; }
+    db.collection("roles").doc(lower).get().then(d=>{ setRole(d.exists?(d.data().role||"viewer"):null); })
+      .catch(e=>{ console.error(e); setRole(null); });
+  }
+
+  /* dati occupazioni */
+  useEffect(()=>{
+    if(MODE==="demo"){ let d=lsLoad(DEMO_OCC); if(!d){ d=demoSeedOcc(); lsSave(DEMO_OCC,d); } setOcc(d); return; }
+    if(!db||!user||!role) return;
+    const unsub=db.collection("occupazioni").onSnapshot(s=>{ const a=[]; s.forEach(x=>{ const o=x.data(); o.id=x.id; a.push(o); }); setOcc(a); }, e=>console.error(e));
+    return ()=>unsub();
+  },[user,role]);
+
+  /* dati segreteria */
+  useEffect(()=>{
+    if(MODE==="demo"){ let d=lsLoad(DEMO_SEG); if(!d){ d=demoSeedSeg(); lsSave(DEMO_SEG,d); } setSeg(d); return; }
+    if(!db||!user||!role) return;
+    const unsub=db.collection("meta").doc("segreteria").onSnapshot(doc=>{ setSeg(doc.exists?(doc.data().bySede||{}):{}); }, e=>console.error(e));
+    return ()=>unsub();
+  },[user,role]);
+
+  /* ruoli admin */
+  useEffect(()=>{
+    if(!showRoles) return;
+    if(MODE==="demo"){ setRolesList([{email:"anteprima@spazioireos",role:"admin"}]); return; }
+    if(!db) return;
+    db.collection("roles").get().then(s=>{ const a=[]; s.forEach(d=>{ const x=d.data(); a.push({email:d.id,role:x.role||"viewer"}); }); setRolesList(a); }).catch(e=>console.error(e));
+  },[showRoles]);
+
+  /* persistenza occupazioni */
+  function persist(obj){
+    if(MODE==="demo"){ let a=occ.slice(); if(obj.id){ a=a.map(o=>o.id===obj.id?obj:o); } else { obj.id="d"+Date.now().toString(36); a.push(obj); } setOcc(a); lsSave(DEMO_OCC,a); return; }
+    const data={sede:obj.sede,room:obj.room,day:obj.day,start:obj.start,end:obj.end,att:obj.att,tipo:obj.tipo,updatedBy:(user?user.email:""),updatedAt:Date.now()};
+    if(obj.id){ db.collection("occupazioni").doc(obj.id).set(data,{merge:true}).catch(e=>alert("Errore salvataggio")); }
+    else { db.collection("occupazioni").add(data).catch(e=>alert("Errore salvataggio")); }
+  }
+  function removeOcc(id){
+    if(MODE==="demo"){ const a=occ.filter(o=>o.id!==id); setOcc(a); lsSave(DEMO_OCC,a); return; }
+    db.collection("occupazioni").doc(id).delete().catch(e=>alert("Errore eliminazione"));
+  }
+
+  /* persistenza segreteria */
+  function saveSeg(next){
+    setSeg(next);
+    if(MODE==="demo"){ lsSave(DEMO_SEG,next); return; }
+    db.collection("meta").doc("segreteria").set({bySede:next},{merge:true}).catch(e=>alert("Errore: solo l'admin pu\u00F2 modificare la segreteria."));
+  }
+
+  /* ruoli */
+  function saveRole(email,r){
+    const e=(email||"").trim().toLowerCase(); if(!e||e.indexOf("@")<0){ alert("Email non valida"); return; }
+    if(MODE==="demo"){ alert("In demo gli accessi non vengono salvati."); return; }
+    db.collection("roles").doc(e).set({role:r,email:e},{merge:true}).then(()=>{ setRolesList(p=>{ const o=p.filter(x=>x.email!==e); o.push({email:e,role:r}); return o; }); setNewEmail(""); })
+      .catch(err=>alert("Errore: solo l'admin pu\u00F2 gestire gli accessi."));
+  }
+  function delRole(email){ if(MODE==="demo") return; db.collection("roles").doc(email).delete().then(()=>setRolesList(p=>p.filter(x=>x.email!==email))).catch(e=>alert("Errore")); }
+
+  /* filtri */
+  const aule = sede==="Tutte" ? [] : SEDI[sede];
+  function hitQT(o){ if(tipoSet.length>0 && tipoSet.indexOf(o.tipo)<0) return false; if(q && (o.att||"").toLowerCase().indexOf(q.toLowerCase())<0) return false; return true; }
+  function segForSedeDay(s,d){ const arr=seg[s]||[]; return arr.filter(x=>x.day===d); }
+
+  /* modale occupazione */
+  function openNew(pSede,pRoom,pDay,pSlot){ setMErr(""); setEditing({id:null,sede:pSede,room:pRoom,day:pDay,start:pSlot,dur:Math.min(4,SLOTS-pSlot),att:"",tipo:"corso"}); }
+  function openEdit(o){ if(!canEdit) return; setMErr(""); setEditing({id:o.id,sede:o.sede,room:o.room,day:o.day,start:o.start,dur:o.end-o.start,att:o.att,tipo:o.tipo}); }
+  function saveModal(){
+    const e=editing; if(!e.att||!e.att.trim()){ setMErr("Inserisci il nome dell'attivit\u00E0."); return; }
+    const start=parseInt(e.start,10),dur=parseInt(e.dur,10),end=start+dur;
+    if(dur<1){ setMErr("La durata deve essere almeno 15 minuti."); return; }
+    if(end>SLOTS){ setMErr("La durata supera le 24:00."); return; }
+    const clash=occ.some(o=>o.id!==e.id&&o.sede===e.sede&&o.room===e.room&&o.day===e.day&&start<o.end&&end>o.start);
+    if(clash){ setMErr("Si sovrappone a un'altra occupazione nella stessa aula."); return; }
+    persist({id:e.id,sede:e.sede,room:e.room,day:e.day,start:start,end:end,att:e.att.trim(),tipo:e.tipo}); setEditing(null);
+  }
+
+  if(!authReady) return <div className="wrap"><div className="empty-state">Caricamento\u2026</div></div>;
+  if(MODE==="live" && !user){
+    return (<div className="wrap"><div className="login">
+      <h1>Calendario occupazioni CDQ</h1>
+      <p>Spazio Ireos soc. coop. sociale ETS<br/>Accedi con il tuo account Google autorizzato.</p>
+      <button className="gbtn" onClick={()=>{ auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e=>alert("Accesso non riuscito")); }}>Accedi con Google</button>
+    </div><footer className="app">Documento di Christian \u2014 Spazio Ireos soc. coop. sociale ETS</footer></div>);
+  }
+  if(MODE==="live" && user && !role){
+    return (<div className="wrap"><div className="login">
+      <h1>Accesso non ancora autorizzato</h1>
+      <p>Il tuo indirizzo <b>{user.email}</b> non risulta abilitato.<br/>Chiedi l'autorizzazione a Christian (Spazio Ireos).</p>
+      <button className="btn" onClick={()=>auth.signOut()}>Esci</button>
+    </div></div>);
+  }
+
+  const showSedeDot = page==="cal" && sede!=="Tutte";
+
+  return (
+  <div className="wrap">
+    <header className="app">
+      <h1>Calendario occupazioni CDQ <span className="b">&middot; Spazio Ireos</span>
+        {showSedeDot && <span className="sededot" style={{background:sedeColor(sede)}} title={sede}></span>}
+      </h1>
+      <span className="grow"></span>
+      <div className="who">{user?user.email:""}
+        <span className={"badge "+(MODE==="demo"?"demo":(role||""))}>{MODE==="demo"?"DEMO":(role||"")}</span>
+        <div>
+          {isAdmin && <button className="btn sm ghost" onClick={()=>setShowRoles(true)}>Gestisci accessi</button>}
+          {MODE==="live" && <button className="btn sm ghost" onClick={()=>auth.signOut()} style={{marginLeft:6}}>Esci</button>}
+        </div>
+      </div>
+    </header>
+
+    {MODE==="demo" && <div className="banner">Modalit&agrave; <b>demo</b>: i dati restano solo su questo dispositivo. Per andare online compila la configurazione Firebase, come da guida.</div>}
+
+    <div className="nav">
+      <button className="seg" aria-pressed={page==="home"} onClick={()=>setPage("home")}>Home</button>
+      <button className="seg" aria-pressed={page==="cal"} onClick={()=>setPage("cal")}>Calendario</button>
+    </div>
+
+    {page==="home" &&
+      <HomeView seg={seg} isAdmin={isAdmin} onEditSede={s=>setSegEdit(s)} goCal={(s)=>{ if(s){setSede(s);} setPage("cal"); setView("giorno"); }} />}
+
+    {page==="cal" && <>
+      <div className="panel">
+        <div className="filters">
+          <div className="views">
+            <button className="seg" aria-pressed={view==="giorno"} onClick={()=>setView("giorno")}>Giorno</button>
+            <button className="seg" aria-pressed={view==="settimana"} onClick={()=>setView("settimana")}>Settimana</button>
+            <button className="seg" aria-pressed={view==="elenco"} onClick={()=>setView("elenco")}>Elenco</button>
+          </div>
+          <div className="fc">
+            <label>Sede</label>
+            <div className="sedeline">
+              {sede!=="Tutte" && <span className="sededot" style={{background:sedeColor(sede)}}></span>}
+              <select value={sede} onChange={ev=>{ setSede(ev.target.value); setAula("Tutte"); }}>
+                {view==="elenco" && <option value="Tutte">Tutte le sedi</option>}
+                {SEDE_NAMES.map(s=> <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="fc">
+            <label>Aula</label>
+            <select value={aula} onChange={ev=>setAula(ev.target.value)} disabled={sede==="Tutte"}>
+              <option value="Tutte">Tutte le aule</option>
+              {aule.map(a=> <option key={a} value={a}>{a}</option>)}
+            </select>
+          </div>
+          {view==="elenco" &&
+          <div className="fc"><label>Giorno</label>
+            <select value={giornoF} onChange={ev=>setGiornoF(ev.target.value)}>
+              <option value="tutti">Tutti i giorni</option>
+              {DAYS.map((d,i)=> <option key={i} value={i}>{d}</option>)}
+            </select></div>}
+          <div className="fc"><label>Cerca attivit&agrave;</label>
+            <input className="search" type="text" value={q} placeholder="es. spagnolo" onChange={ev=>setQ(ev.target.value)} /></div>
+          <div className="fc"><label>Tipo</label>
+            <div className="chips">{TYPES.map(t=>{ const on=tipoSet.indexOf(t.key)>=0;
+              return <span key={t.key} className="chip" aria-pressed={on} onClick={()=> setTipoSet(p=> on?p.filter(k=>k!==t.key):p.concat([t.key]))}>
+                <span className="sw" style={{background:t.color}}></span>{t.label}</span>; })}</div></div>
+          <span className="grow"></span>
+          {canEdit && <button className="btn primary" onClick={()=>{ const s=sede==="Tutte"?SEDE_NAMES[0]:sede; const r=(aula!=="Tutte")?aula:SEDI[s][0]; openNew(s,r,view==="giorno"?day:0,4); }}>+ Nuova occupazione</button>}
+        </div>
+      </div>
+
+      {view==="giorno" && <DayTabs day={day} setDay={setDay} />}
+
+      {(view==="giorno"||view==="settimana") && sede==="Tutte" &&
+        <div className="grid-card"><div className="empty-state">Seleziona una sede per la vista a griglia, oppure usa la vista <b>Elenco</b>.</div></div>}
+
+      {view==="giorno" && sede!=="Tutte" &&
+        <GridDay sede={sede} aule={aula==="Tutte"?aule:[aula]} day={day} occ={occ} hitQT={hitQT}
+                 segBands={segForSedeDay(sede,day)} segColor={sedeColor(sede)}
+                 canEdit={canEdit} onCell={openNew} onBlock={openEdit} />}
+
+      {view==="settimana" && sede!=="Tutte" &&
+        <GridWeek sede={sede} aula={aula==="Tutte"?aule[0]:aula} aulaIsAll={aula==="Tutte"} aule={aule}
+                  occ={occ} hitQT={hitQT} seg={seg[sede]||[]} segColor={sedeColor(sede)}
+                  canEdit={canEdit} onCell={openNew} onBlock={openEdit} />}
+
+      {view==="elenco" &&
+        <ListView occ={occ} sede={sede} aula={aula} giornoF={giornoF} hitQT={hitQT} canEdit={canEdit} onBlock={openEdit} />}
+
+      <div className="legend">
+        {TYPES.map(t=> <span key={t.key} className="it"><span className="sw" style={{background:t.color}}></span>{t.label}</span>)}
+        <span className="it"><span className="frm" style={{border:SEG_BORDER+"px solid "+sedeColor(sede==="Tutte"?"Garibaldi":sede)}}></span>cornice = segreteria presente</span>
+      </div>
+    </>}
+
+    <footer className="app">Documento di Christian &mdash; Spazio Ireos soc. coop. sociale ETS &middot; calendario settimanale tipo &middot; fasce 15&nbsp;min 8:00&ndash;24:00</footer>
+
+    {/* modale occupazione */}
+    <div className={"ovl"+(editing?" open":"")} onClick={ev=>{ if(ev.target.classList.contains("ovl")) setEditing(null); }}>
+      {editing && <div className="modal">
+        <h2>{editing.id?"Modifica occupazione":"Nuova occupazione"}</h2>
+        <div className="err">{mErr||"\u00A0"}</div>
+        <div className="field"><label>Attivit&agrave;</label>
+          <input type="text" value={editing.att} maxLength={80} placeholder="es. Corso di spagnolo" onChange={ev=>setEditing(Object.assign({},editing,{att:ev.target.value}))} /></div>
+        <div className="field"><label>Tipo occupazione</label>
+          <select value={editing.tipo} onChange={ev=>setEditing(Object.assign({},editing,{tipo:ev.target.value}))}>{TYPES.map(t=> <option key={t.key} value={t.key}>{t.label}</option>)}</select></div>
+        <div className="row2">
+          <div className="field"><label>Sede</label>
+            <select value={editing.sede} onChange={ev=>{ const s=ev.target.value; setEditing(Object.assign({},editing,{sede:s,room:SEDI[s][0]})); }}>{SEDE_NAMES.map(s=> <option key={s} value={s}>{s}</option>)}</select></div>
+          <div className="field"><label>Aula</label>
+            <select value={editing.room} onChange={ev=>setEditing(Object.assign({},editing,{room:ev.target.value}))}>{SEDI[editing.sede].map(a=> <option key={a} value={a}>{a}</option>)}</select></div>
+        </div>
+        <div className="row2">
+          <div className="field"><label>Giorno</label>
+            <select value={editing.day} onChange={ev=>setEditing(Object.assign({},editing,{day:parseInt(ev.target.value,10)}))}>{DAYS.map((d,i)=> <option key={i} value={i}>{d}</option>)}</select></div>
+          <div className="field"><label>Ora inizio</label>
+            <select value={editing.start} onChange={ev=>{ const s=parseInt(ev.target.value,10); setEditing(Object.assign({},editing,{start:s,dur:Math.min(editing.dur,SLOTS-s)})); }}>
+              {Array.apply(null,{length:SLOTS}).map((x,i)=> <option key={i} value={i}>{slotToTime(i)}</option>)}</select></div>
+          <div className="field"><label>Durata</label>
+            <select value={editing.dur} onChange={ev=>setEditing(Object.assign({},editing,{dur:parseInt(ev.target.value,10)}))}>
+              {Array.apply(null,{length:SLOTS-editing.start}).map((x,i)=> <option key={i} value={i+1}>{durLabel(i+1)}</option>)}</select></div>
+        </div>
+        <div className="modal-actions">
+          {editing.id && <button className="btn danger" onClick={()=>{ removeOcc(editing.id); setEditing(null); }}>Elimina</button>}
+          <span className="grow"></span>
+          <button className="btn ghost" onClick={()=>setEditing(null)}>Annulla</button>
+          <button className="btn primary" onClick={saveModal}>Salva</button>
+        </div>
+      </div>}
+    </div>
+
+    {/* modale segreteria */}
+    {segEdit && <SegEditor sede={segEdit} seg={seg} onClose={()=>setSegEdit(null)} onSave={saveSeg} />}
+
+    {/* modale ruoli */}
+    <div className={"ovl"+(showRoles?" open":"")} onClick={ev=>{ if(ev.target.classList.contains("ovl")) setShowRoles(false); }}>
+      {showRoles && <div className="modal">
+        <h2>Gestisci accessi</h2>
+        <p className="muted" style={{marginTop:0,fontSize:12.5}}><b>admin</b> gestisce accessi e segreteria, <b>editor</b> inserisce/modifica occupazioni, <b>viewer</b> vede soltanto.</p>
+        <div className="row2">
+          <div className="field" style={{flex:2}}><label>Email Google</label>
+            <input type="text" value={newEmail} placeholder="persona@gmail.com" onChange={ev=>setNewEmail(ev.target.value)} /></div>
+          <div className="field"><label>Ruolo</label>
+            <select value={newRole} onChange={ev=>setNewRole(ev.target.value)}><option value="viewer">viewer</option><option value="editor">editor</option><option value="admin">admin</option></select></div>
+        </div>
+        <div className="modal-actions" style={{marginBottom:10}}><button className="btn primary" onClick={()=>saveRole(newEmail,newRole)}>Aggiungi / aggiorna</button></div>
+        <div>{rolesList.length===0 && <div className="muted" style={{fontSize:13}}>Nessun accesso registrato.</div>}
+          {rolesList.map(r=> <div className="rolerow" key={r.email}><span>{r.email} <span className={"badge "+r.role}>{r.role}</span></span><button className="btn sm danger" onClick={()=>delRole(r.email)}>Rimuovi</button></div>)}</div>
+        <div className="modal-actions" style={{marginTop:12}}><button className="btn ghost" onClick={()=>setShowRoles(false)}>Chiudi</button></div>
+      </div>}
+    </div>
+  </div>
+  );
+}
+
+/* ---------- Home ---------- */
+function fasceText(arr,d){ const f=arr.filter(x=>x.day===d).sort((a,b)=>a.start-b.start); if(f.length===0) return null; return f.map(x=>slotToTime(x.start)+"\u2013"+slotToTime(x.end)).join(", "); }
+function HomeView({seg,isAdmin,onEditSede,goCal}){
+  return (
+    <div>
+      <div className="panel"><b>Riepilogo segreteria</b> <span className="muted">&middot; presenza settimanale per Casa di Quartiere. Le ore di segreteria appaiono incorniciate nel calendario con il colore della sede.</span></div>
+      <div className="home-grid">
+        {SEDE_NAMES.map(s=>{
+          const arr=seg[s]||[];
+          return (
+            <div className="seg-card" key={s} style={{borderTopColor:sedeColor(s)}}>
+              <h3><span className="sededot" style={{background:sedeColor(s)}}></span>{s}</h3>
+              {DAYS.map((d,i)=>{ const t=fasceText(arr,i); if(!t) return null;
+                return <div className="seg-row" key={i}><span>{d}</span><span className="muted">{t}</span></div>; })}
+              {arr.length===0 && <div className="seg-empty">Nessuna presenza impostata.</div>}
+              <div className="acts">
+                {isAdmin && <button className="btn sm" onClick={()=>onEditSede(s)}>Modifica orari</button>}
+                <button className="btn sm ghost" style={{marginLeft:6}} onClick={()=>goCal(s)}>Apri calendario</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- editor segreteria ---------- */
+function SegEditor({sede,seg,onClose,onSave}){
+  const [list,setList]=useState((seg[sede]||[]).map(x=>Object.assign({},x)));
+  const [d,setD]=useState(0); const [s,setS]=useState(4); const [e,setE]=useState(20);
+  function add(){ if(e<=s){ alert("L'ora di fine deve essere successiva all'inizio."); return; }
+    setList(prev=>prev.concat([{day:d,start:s,end:e}]).sort((a,b)=>a.day-b.day||a.start-b.start)); }
+  function del(idx){ setList(prev=>prev.filter((x,i)=>i!==idx)); }
+  function save(){ const next=Object.assign({},seg); next[sede]=list; onSave(next); onClose(); }
+  return (
+    <div className="ovl open" onClick={ev=>{ if(ev.target.classList.contains("ovl")) onClose(); }}>
+      <div className="modal">
+        <h2><span className="sededot" style={{background:sedeColor(sede),marginRight:8}}></span>Segreteria &mdash; {sede}</h2>
+        <div className="row2">
+          <div className="field"><label>Giorno</label>
+            <select value={d} onChange={ev=>setD(parseInt(ev.target.value,10))}>{DAYS.map((x,i)=> <option key={i} value={i}>{x}</option>)}</select></div>
+          <div className="field"><label>Dalle</label>
+            <select value={s} onChange={ev=>setS(parseInt(ev.target.value,10))}>{Array.apply(null,{length:SLOTS}).map((x,i)=> <option key={i} value={i}>{slotToTime(i)}</option>)}</select></div>
+          <div className="field"><label>Alle</label>
+            <select value={e} onChange={ev=>setE(parseInt(ev.target.value,10))}>{Array.apply(null,{length:SLOTS}).map((x,i)=> <option key={i+1} value={i+1}>{slotToTime(i+1)}</option>)}</select></div>
+        </div>
+        <div className="modal-actions" style={{marginBottom:8}}><button className="btn primary" onClick={add}>Aggiungi fascia</button></div>
+        <div>
+          {list.length===0 && <div className="muted" style={{fontSize:13}}>Nessuna fascia impostata.</div>}
+          {list.map((x,i)=> <div className="rolerow" key={i}><span>{DAYS[x.day]} &middot; {slotToTime(x.start)}\u2013{slotToTime(x.end)}</span><button className="btn sm danger" onClick={()=>del(i)}>Rimuovi</button></div>)}
+        </div>
+        <div className="modal-actions" style={{marginTop:12}}>
+          <button className="btn ghost" onClick={onClose}>Annulla</button>
+          <button className="btn primary" onClick={save}>Salva segreteria</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- griglie ---------- */
+function DayTabs({day,setDay}){ return <div className="days">{DAYS.map((d,i)=> <button key={i} className="day-tab" aria-pressed={i===day} onClick={()=>setDay(i)}>{d}</button>)}</div>; }
+
+function inBands(bands,slot){ for(let i=0;i<bands.length;i++){ if(slot>=bands[i].start && slot<bands[i].end) return true; } return false; }
+
+function buildOcc(cols, scope){
+  const occ=cols.map(()=> new Array(SLOTS).fill(null));
+  scope.forEach(b=>{ const ci=b.__col; if(ci<0) return; const s=Math.max(0,b.start),e=Math.min(SLOTS,b.end);
+    for(let i=s;i<e;i++){ occ[ci][i]=(i===s)?{kind:"start",b:b,span:e-s}:{kind:"cov"}; } });
+  return occ;
+}
+
+/* GridCore:
+   railBands  -> fasce segreteria da incorniciare sulla colonna Ora (vista Giorno)
+   colBands(ci) -> fasce segreteria da incorniciare sulla colonna ci (vista Settimana)
+   segColor   -> colore cornice (colore sede) */
+function GridCore({cols,colLabel,scope,hitQT,canEdit,onEmpty,onBlock,railBands,colBands,segColor}){
+  railBands = railBands||[]; const cb = colBands||function(){return [];};
+  const occMat=buildOcc(cols,scope);
+  function frameStyle(bands,slot){
+    if(!inBands(bands,slot)) return null;
+    const st={}; const top=!inBands(bands,slot-1), bot=!inBands(bands,slot+1);
+    st.borderLeft=SEG_BORDER+"px solid "+segColor; st.borderRight=SEG_BORDER+"px solid "+segColor;
+    if(top) st.borderTop=SEG_BORDER+"px solid "+segColor;
+    if(bot) st.borderBottom=SEG_BORDER+"px solid "+segColor;
+    st.background=hexToRgba(segColor,0.10);
+    return st;
+  }
+  const rows=[];
+  for(let r=0;r<SLOTS;r++){
+    const isHour=((START_MIN+r*15)%60)===0;
+    const railFrame=frameStyle(railBands,r);
+    const railStyle=railFrame?railFrame:{};
+    const tds=[<td key="t" className="time-col" style={railStyle}>{slotToTime(r)}</td>];
+    for(let c=0;c<cols.length;c++){
+      const cell=occMat[c][r];
+      const bandsC=cb(c);
+      if(cell && cell.kind==="cov") continue;
+      if(cell && cell.kind==="start"){
+        const b=cell.b,t=typeOf(b.tipo),hit=hitQT(b);
+        const segHit = inBands(bandsC,b.start);
+        const style={borderLeftColor:t.color, background:hexToRgba(t.color,0.16)};
+        if(segHit){ style.boxShadow="inset 0 0 0 "+SEG_BORDER+"px "+segColor; }
+        tds.push(
+          <td key={c} rowSpan={cell.span} className={"block"+(hit&&canEdit?" clk":"")+(hit?"":" dim")}
+              style={style} onClick={ hit&&canEdit?(()=>onBlock(b)):undefined }>
+            <div className="act">{b.att||"(senza titolo)"}</div>
+            <div className="meta">{slotToTime(b.start)+"\u2013"+slotToTime(b.end)}</div>
+            <div className="tp" style={{color:t.color}}>{t.label}</div>
+          </td>);
+      } else {
+        const f=frameStyle(bandsC,r);
+        tds.push(<td key={c} className={"cell empty"+(canEdit?" editable":"")} style={f?f:undefined}
+                     onClick={ canEdit?(()=>onEmpty(c,r)):undefined }></td>);
+      }
+    }
+    rows.push(<tr key={r} className={isHour?"hour":""}>{tds}</tr>);
+  }
+  return (<div className="grid-card"><div className="grid-scroll"><table>
+    <thead><tr><th className="th0 time-col">Ora</th>{cols.map((c,i)=> <th key={i}>{colLabel(c,i)}</th>)}</tr></thead>
+    <tbody>{rows}</tbody></table></div></div>);
+}
+
+function GridDay({sede,aule,day,occ,hitQT,canEdit,onCell,onBlock,segBands,segColor}){
+  const cols=aule;
+  const scope=occ.filter(o=>o.sede===sede&&o.day===day&&cols.indexOf(o.room)>=0).map(o=>Object.assign({},o,{__col:cols.indexOf(o.room)}));
+  return <GridCore cols={cols} colLabel={c=>c} scope={scope} hitQT={hitQT} canEdit={canEdit}
+            railBands={segBands} segColor={segColor}
+            onEmpty={(ci,slot)=>onCell(sede,cols[ci],day,slot)} onBlock={onBlock} />;
+}
+
+function GridWeek({sede,aula,aulaIsAll,aule,occ,hitQT,canEdit,onCell,onBlock,seg,segColor}){
+  const theAula=aulaIsAll?aule[0]:aula; const cols=[0,1,2,3,4,5,6];
+  const scope=occ.filter(o=>o.sede===sede&&o.room===theAula).map(o=>Object.assign({},o,{__col:o.day}));
+  const colBands=(ci)=> seg.filter(x=>x.day===ci);
+  return (<div>
+    {aulaIsAll && <div className="banner">Vista settimana: aula <b>{theAula}</b>. Per un&apos;altra aula scegli dal filtro <b>Aula</b>.</div>}
+    <GridCore cols={cols} colLabel={c=>DAYS[c]} scope={scope} hitQT={hitQT} canEdit={canEdit}
+      colBands={colBands} segColor={segColor}
+      onEmpty={(ci,slot)=>onCell(sede,theAula,ci,slot)} onBlock={onBlock} />
+  </div>);
+}
+
+function ListView({occ,sede,aula,giornoF,hitQT,canEdit,onBlock}){
+  let rows=occ.filter(o=>{ if(sede!=="Tutte"&&o.sede!==sede) return false; if(aula!=="Tutte"&&o.room!==aula) return false; if(giornoF!=="tutti"&&o.day!==parseInt(giornoF,10)) return false; return hitQT(o); });
+  rows.sort((a,b)=> a.sede.localeCompare(b.sede)||a.day-b.day||a.start-b.start||a.room.localeCompare(b.room));
+  if(rows.length===0) return <div className="grid-card"><div className="empty-state">Nessuna occupazione corrisponde ai filtri.</div></div>;
+  return (<div className="grid-card"><div className="grid-scroll"><table className="list">
+    <thead><tr><th>Sede</th><th>Aula</th><th>Giorno</th><th>Orario</th><th>Attivit&agrave;</th><th>Tipo</th></tr></thead>
+    <tbody>{rows.map(o=>{ const t=typeOf(o.tipo);
+      return <tr key={o.id} onClick={ canEdit?(()=>onBlock(o)):undefined }>
+        <td><span className="sedepill"><span className="d" style={{background:sedeColor(o.sede)}}></span>{o.sede}</span></td>
+        <td>{o.room}</td><td>{DAYS[o.day]}</td>
+        <td style={{whiteSpace:"nowrap"}}>{slotToTime(o.start)+"\u2013"+slotToTime(o.end)}</td>
+        <td>{o.att}</td>
+        <td><span className="pill" style={{borderLeftColor:t.color,background:hexToRgba(t.color,0.16)}}>{t.label}</span></td>
+      </tr>; })}</tbody>
+  </table></div></div>);
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+<script>
+(function(){
+  try{
+    var src=document.getElementById("appsrc").textContent;
+    var out=Babel.transform(src,{presets:[["react",{runtime:"classic"}]]}).code;
+    var s=document.createElement("script"); s.text=out; document.body.appendChild(s);
+  }catch(e){
+    document.getElementById("root").innerHTML='<div style="padding:24px;color:#8E2A20;font-family:sans-serif">Errore di avvio: '+((e&&e.message)?e.message:e)+'</div>';
+    console.error(e);
+  }
+})();
+</script>
+</body>
+</html>
