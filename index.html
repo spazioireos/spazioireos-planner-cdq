@@ -95,13 +95,17 @@
   td.cell{padding:0;min-width:112px}
   td.cell.ph{background:repeating-linear-gradient(45deg,#fafafa,#fafafa 6px,#f3f3f3 6px,#f3f3f3 12px)}
   td.cell.empty.editable{cursor:pointer}td.cell.empty.editable:hover{background:#FBF7F0}
-  td.block{padding:3px 6px;overflow:hidden;border-left:3px solid #888}
+  td.block{padding:3px 6px;overflow:hidden;border-left:3px solid #888;position:relative}
   td.block.clk{cursor:pointer}
   td.block .act{font-weight:700;font-size:12px;line-height:1.2;overflow:hidden;text-overflow:ellipsis}
   td.block .meta{font-size:10px;color:var(--muted);margin-top:1px;font-variant-numeric:tabular-nums}
   td.block .tp{font-size:10px;font-weight:700}
   td.block .sub{font-size:10px;color:var(--muted);line-height:1.15;overflow:hidden;text-overflow:ellipsis}
   td.block .per{font-size:9.5px;color:var(--muted);font-style:italic;line-height:1.1}
+  .certdot{display:inline-block;width:12px;height:12px;border-radius:50%;border:2px solid #B0AAA0;background:transparent;box-sizing:border-box;vertical-align:middle}
+  .certdot.clk{cursor:pointer}
+  td.block .certdot{position:absolute;top:3px;right:3px;z-index:2}
+  .wkchip .certdot{margin-right:5px}
   .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#1F2430;color:#fff;padding:9px 18px;border-radius:999px;font-size:13px;font-weight:700;box-shadow:0 6px 20px rgba(0,0,0,.25);z-index:80}
   td.block.dim{opacity:.28;filter:grayscale(.4)}
   .cdqtag{display:block;font-size:8.5px;font-weight:800;padding:0 4px;border-radius:3px;margin-bottom:2px;letter-spacing:.02em;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -211,7 +215,7 @@ function hexToRgba(hex,a){ let h=hex.replace("#",""); const r=parseInt(h.substri
 function lumin(hex){ let h=hex.replace("#",""); const f=c=>{ c=c/255; return c<=0.03928?c/12.92:Math.pow((c+0.055)/1.055,2.4); };
   return 0.2126*f(parseInt(h.substring(0,2),16))+0.7152*f(parseInt(h.substring(2,4),16))+0.0722*f(parseInt(h.substring(4,6),16)); }
 const onColor = hex => lumin(hex)>0.55 ? "#1F2430" : "#FFFFFF";
-const SEG_BORDER = 1;
+const SEG_BORDER = 2;
 
 /* piani / colonne */
 function floorTok(name){ const m=name.match(/(PT|\dP)\s*$/i); return m?m[1].toUpperCase():""; }
@@ -409,12 +413,13 @@ function App(){
   function flash(m){ setToast(m); if(toastRef.current) clearTimeout(toastRef.current); toastRef.current=setTimeout(function(){ setToast(""); toastRef.current=null; },1800); }
   function markDirty(){ dirtyRef.current=true; setDirty(true); }
   function clearDirty(){ dirtyRef.current=false; setDirty(false); }
+  function cycleCert(o){ if(!canEdit) return; const nx={"":"ok","ok":"chk","chk":""}; const nc=nx[o.cert||""]; setOccAll(prev=>prev.map(x=>x.id===o.id?Object.assign({},x,{cert:nc}):x)); markDirty(); }
 
   function saveAll(){
     if(MODE==="demo"){ lsSave(K_ANNI,anni); lsSave(K_OCC,occAll); lsSave(K_SEG,segAll); setDelIds([]); clearDirty(); flash("Tutto salvato"); return; }
     try {
       const ops=[];
-      occAll.forEach(o=>{ if(!o.id) return; ops.push({t:"set",ref:db.collection("occupazioni").doc(fid(String(o.id))), data:{as:o.as||"",periodo:o.periodo||"",sede:o.sede||"",room:o.room||"",day:o.day||0,start:o.start||0,end:o.end||0,att:(o.att||"").trim(),att2:(o.att2||"").trim(),per:o.per||"",tipo:o.tipo||"corso"}}); });
+      occAll.forEach(o=>{ if(!o.id) return; ops.push({t:"set",ref:db.collection("occupazioni").doc(fid(String(o.id))), data:{as:o.as||"",periodo:o.periodo||"",sede:o.sede||"",room:o.room||"",day:o.day||0,start:o.start||0,end:o.end||0,att:(o.att||"").trim(),att2:(o.att2||"").trim(),per:o.per||"",cert:o.cert||"",tipo:o.tipo||"corso"}}); });
       delIds.forEach(id=>ops.push({t:"del",ref:db.collection("occupazioni").doc(fid(String(id)))}));
       if(isAdmin){ Object.keys(anni).forEach(n=>ops.push({t:"set",ref:db.collection("anni").doc(fid(n)), data:{nome:n,periodi:(anni[n]&&anni[n].periodi)?anni[n].periodi:[]}}));
         Object.keys(segAll).forEach(k=>ops.push({t:"set",ref:db.collection("segreteria").doc(fid(k)), data:{key:k,bySede:segAll[k]||{}}})); }
@@ -501,15 +506,15 @@ function App(){
   function segForSedeDay(s,d){ const arr=seg[s]||[]; return arr.filter(x=>x.day===d); }
 
   /* modale occ */
-  function openNew(pSede,pRoom,pDay,pSlot){ setMErr(""); setDiscOther(false); setEditing({id:null,sede:pSede,room:pRoom,day:pDay,start:pSlot,dur:Math.min(4,SLOTS-pSlot),att:"",att2:"",per:"",tipo:"corso"}); }
-  function openEdit(o){ if(!canEdit) return; setMErr(""); setDiscOther(false); setEditing({id:o.id,sede:o.sede,room:o.room,day:o.day,start:o.start,dur:o.end-o.start,att:o.att,att2:o.att2?o.att2:"",per:o.per?o.per:"",tipo:o.tipo}); }
+  function openNew(pSede,pRoom,pDay,pSlot){ setMErr(""); setDiscOther(false); setEditing({id:null,sede:pSede,room:pRoom,day:pDay,start:pSlot,dur:Math.min(4,SLOTS-pSlot),att:"",att2:"",per:"",cert:"",tipo:"corso"}); }
+  function openEdit(o){ if(!canEdit) return; setMErr(""); setDiscOther(false); setEditing({id:o.id,sede:o.sede,room:o.room,day:o.day,start:o.start,dur:o.end-o.start,att:o.att,att2:o.att2?o.att2:"",per:o.per?o.per:"",cert:o.cert?o.cert:"",tipo:o.tipo}); }
   function saveModal(){ const e=editing; if(!e.att||!e.att.trim()){ setMErr(e.tipo==="esterni"?"Inserisci la denominazione.":"Inserisci il nome dell'attivit\u00E0."); return; }
     const start=parseInt(e.start,10),dur=parseInt(e.dur,10),end=start+dur;
     if(dur<1){ setMErr("La durata deve essere almeno 15 minuti."); return; }
     if(end>SLOTS){ setMErr("La durata supera le 24:00."); return; }
     const clash=occ.some(o=>o.id!==e.id&&o.sede===e.sede&&o.room===e.room&&o.day===e.day&&start<o.end&&end>o.start);
     if(clash){ setMErr("Si sovrappone a un'altra occupazione nella stessa aula."); return; }
-    persist({id:e.id,sede:e.sede,room:e.room,day:e.day,start:start,end:end,att:e.att.trim(),att2:(e.att2||"").trim(),per:e.per||"",tipo:e.tipo}); setEditing(null); flash("Applicato \u2014 premi Salva");
+    persist({id:e.id,sede:e.sede,room:e.room,day:e.day,start:start,end:end,att:e.att.trim(),att2:(e.att2||"").trim(),per:e.per||"",cert:e.cert||"",tipo:e.tipo}); setEditing(null); flash("Applicato \u2014 premi Salva");
   }
 
   /* tema schermata per CDQ */
@@ -597,11 +602,11 @@ function App(){
     {page==="cal" && !noAS && <>
       {(view==="giorno"||view==="giornotutte") && <div className="days">{DAYS.map((d,i)=> <button key={i} className="day-tab" aria-pressed={i===day} onClick={()=>setDay(i)}>{d}</button>)}</div>}
       {(view==="giorno"||view==="settimana"||view==="settaule") && sede==="Tutte" && <div className="grid-card"><div className="empty-state">Seleziona una sede per la griglia, oppure usa <b>Tutte le CDQ</b> o <b>Elenco</b>.</div></div>}
-      {view==="giorno" && sede!=="Tutte" && <GridDay sede={sede} aula={aula} day={day} occ={occ} hitQT={hitQT} segBands={segForSedeDay(sede,day)} segColor={sedeColor(sede)} canEdit={canEdit} onCell={openNew} onBlock={openEdit} />}
-      {view==="giornotutte" && <GridDayAll day={day} occ={occ} hitQT={hitQT} canEdit={canEdit} onCell={openNew} onBlock={openEdit} />}
-      {view==="settimana" && sede!=="Tutte" && <GridWeek sede={sede} aula={aula} occ={occ} hitQT={hitQT} seg={seg[sede]||[]} segColor={sedeColor(sede)} canEdit={canEdit} onCell={openNew} onBlock={openEdit} />}
-      {view==="settaule" && sede!=="Tutte" && <WeekGridAule sede={sede} aula={aula} occ={occ} hitQT={hitQT} canEdit={canEdit} onCell={openNew} onBlock={openEdit} />}
-      {view==="elenco" && <ListView occ={occ} sede={sede} aula={aula} giornoF={giornoF} hitQT={hitQT} canEdit={canEdit} onBlock={openEdit} />}
+      {view==="giorno" && sede!=="Tutte" && <GridDay sede={sede} aula={aula} day={day} occ={occ} hitQT={hitQT} segBands={segForSedeDay(sede,day)} segColor={sedeColor(sede)} canEdit={canEdit} onCell={openNew} onBlock={openEdit} onCert={cycleCert} />}
+      {view==="giornotutte" && <GridDayAll day={day} occ={occ} hitQT={hitQT} canEdit={canEdit} onCell={openNew} onBlock={openEdit} onCert={cycleCert} />}
+      {view==="settimana" && sede!=="Tutte" && <GridWeek sede={sede} aula={aula} occ={occ} hitQT={hitQT} seg={seg[sede]||[]} segColor={sedeColor(sede)} canEdit={canEdit} onCell={openNew} onBlock={openEdit} onCert={cycleCert} />}
+      {view==="settaule" && sede!=="Tutte" && <WeekGridAule sede={sede} aula={aula} occ={occ} hitQT={hitQT} canEdit={canEdit} onCell={openNew} onBlock={openEdit} onCert={cycleCert} />}
+      {view==="elenco" && <ListView occ={occ} sede={sede} aula={aula} giornoF={giornoF} hitQT={hitQT} canEdit={canEdit} onBlock={openEdit} onCert={cycleCert} />}
       <div className="legend">{TYPES.map(t=> <span key={t.key} className="it" style={t.ink?{color:t.ink,fontWeight:700}:undefined}><span className="sw" style={{background:t.color}}></span>{t.label}</span>)}
         <span className="it"><span className="frm" style={{border:SEG_BORDER+"px solid "+sedeColor(sede==="Tutte"?"Garibaldi":sede)}}></span>cornice = segreteria</span></div>
     </>}
@@ -642,7 +647,7 @@ function App(){
           <div className="field"><label>Inizio</label><select value={editing.start} onChange={ev=>{ const s=parseInt(ev.target.value,10); setEditing(Object.assign({},editing,{start:s,dur:Math.min(editing.dur,SLOTS-s)})); }}>{Array.apply(null,{length:SLOTS}).map((x,i)=> <option key={i} value={i}>{slotToTime(i)}</option>)}</select></div>
           <div className="field"><label>Durata</label><select value={editing.dur} onChange={ev=>setEditing(Object.assign({},editing,{dur:parseInt(ev.target.value,10)}))}>{Array.apply(null,{length:SLOTS-editing.start}).map((x,i)=> <option key={i} value={i+1}>{durLabel(i+1)}</option>)}</select></div>
         </div>
-        <div className="modal-actions">{editing.id && <button className="btn danger" onClick={()=>{ removeOcc(editing.id); setEditing(null); }}>Elimina</button>}{editing.id && <button className="btn" onClick={()=>{ setEditing(Object.assign({},editing,{id:null})); setMErr(""); flash("Copia: scegli giorno/ora e Applica"); }}>Duplica</button>}<span className="grow"></span>
+        <div className="modal-actions">{editing.id && <button className="btn danger" onClick={()=>{ removeOcc(editing.id); setEditing(null); }}>Elimina</button>}{editing.id && <button className="btn" onClick={()=>{ setEditing(Object.assign({},editing,{id:null,cert:""})); setMErr(""); flash("Copia: scegli giorno/ora e Applica"); }}>Duplica</button>}<span className="grow"></span>
           <button className="btn ghost" onClick={()=>setEditing(null)}>Annulla</button><button className="btn primary" onClick={saveModal}>Applica</button></div>
       </div>}
     </div>
@@ -788,7 +793,12 @@ function buildOcc(cols,scope){ const occ=cols.map(()=>new Array(SLOTS).fill(null
   scope.forEach(b=>{ const ci=b.__col; if(ci<0) return; const s=Math.max(0,b.start),e=Math.min(SLOTS,b.end);
     for(let i=s;i<e;i++){ occ[ci][i]=(i===s)?{kind:"start",b:b,span:e-s}:{kind:"cov"}; } }); return occ; }
 
-function GridCore({cols,scope,canEdit,onEmpty,onBlock,railBands,colBands,segColor}){
+function certColor(c){ return c==="ok"?"#27AE60":(c==="chk"?"#FFB74D":""); }
+function CertDot({o,canEdit,onCert}){ const c=o.cert||""; const col=certColor(c);
+  const title=c==="ok"?"Certificato: tutto ok (clic per cambiare)":(c==="chk"?"Da verificare (clic per cambiare)":"Da certificare (clic: verde = ok, arancione = da verificare)");
+  return <span className={"certdot"+(canEdit?" clk":"")} title={title} style={col?{background:col,borderColor:col}:undefined} onClick={canEdit?(ev=>{ ev.stopPropagation(); onCert(o); }):undefined}></span>;
+}
+function GridCore({cols,scope,canEdit,onEmpty,onBlock,onCert,railBands,colBands,segColor}){
   railBands=railBands||[]; const cb=colBands||function(){return [];};
   const occMat=buildOcc(cols,scope);
   function frame(bands,slot){ if(!inBands(bands,slot)) return null; const st={};
@@ -805,7 +815,7 @@ function GridCore({cols,scope,canEdit,onEmpty,onBlock,railBands,colBands,segColo
       if(cell&&cell.kind==="start"){ const b=cell.b,t=typeOf(b.tipo),ink=t.ink;
         const style={borderLeftColor:t.color,background:hexToRgba(t.color,0.16)};
         if(inBands(bands,b.start)) style.boxShadow="inset 0 0 0 "+SEG_BORDER+"px "+segColor;
-        tds.push(<td key={c} rowSpan={cell.span} className={"block"+(canEdit?" clk":"")} style={style} onClick={canEdit?(()=>onBlock(b)):undefined}>
+        tds.push(<td key={c} rowSpan={cell.span} className={"block"+(canEdit?" clk":"")} style={style} onClick={canEdit?(()=>onBlock(b)):undefined}>{onCert?<CertDot o={b} canEdit={canEdit} onCert={onCert} />:null}
           <div className="act" style={ink?{color:ink}:undefined}>{b.att||"(senza titolo)"}</div>{b.att2?<div className="sub" style={ink?{color:ink}:undefined}>{b.att2}</div>:null}<div className="meta">{slotToTime(b.start)+"\u2013"+slotToTime(b.end)}</div><div className="tp" style={{color:ink||t.color}}>{t.label}</div>{perLabel(b.per,b.day)?<div className="per">{perLabel(b.per,b.day)}</div>:null}</td>);
       } else { const ph=cols[c].ph; const f=frame(bands,r);
         tds.push(<td key={c} className={"cell empty"+(ph?" ph":"")+((canEdit)?" editable":"")} style={f?f:undefined} onClick={canEdit?(()=>onEmpty(c,r)):undefined}></td>);
@@ -818,31 +828,31 @@ function GridCore({cols,scope,canEdit,onEmpty,onBlock,railBands,colBands,segColo
     <tbody>{rows}</tbody></table></div></div>);
 }
 
-function GridDay({sede,aula,day,occ,hitQT,canEdit,onCell,onBlock,segBands,segColor}){
+function GridDay({sede,aula,day,occ,hitQT,canEdit,onCell,onBlock,onCert,segBands,segColor}){
   let cols=colsForSede(sede); if(aula!=="Tutte"){ cols=cols.filter(c=>c.name===aula); }
   const nameIdx={}; cols.forEach((c,i)=>nameIdx[c.name]=i);
   const scope=occ.filter(o=>o.sede===sede&&o.day===day&&nameIdx[o.room]!==undefined&&hitQT(o)).map(o=>Object.assign({},o,{__col:nameIdx[o.room]}));
-  return <GridCore cols={cols} scope={scope} canEdit={canEdit} railBands={segBands} segColor={segColor}
+  return <GridCore cols={cols} scope={scope} canEdit={canEdit} onCert={onCert} railBands={segBands} segColor={segColor}
             onEmpty={(ci,slot)=>onCell(sede,cols[ci].name,day,slot)} onBlock={onBlock} />;
 }
-function GridWeek({sede,aula,occ,hitQT,canEdit,onCell,onBlock,seg,segColor}){
+function GridWeek({sede,aula,occ,hitQT,canEdit,onCell,onBlock,onCert,seg,segColor}){
   const allCols=colsForSede(sede); const theAula=(aula!=="Tutte")?aula:allCols[0].name;
   const cols=[0,1,2,3,4,5,6].map(d=>({name:DAYS[d],floor:"",ph:false,_d:d}));
   const scope=occ.filter(o=>o.sede===sede&&o.room===theAula&&hitQT(o)).map(o=>Object.assign({},o,{__col:o.day}));
   const colBands=(ci)=> seg.filter(x=>x.day===ci);
   return (<div>{aula==="Tutte" && <div className="banner">Vista settimana: aula <b>{theAula}</b>. Per un&apos;altra aula scegli dal filtro <b>Aula</b>.</div>}
-    <GridCore cols={cols} scope={scope} canEdit={canEdit} colBands={colBands} segColor={segColor}
+    <GridCore cols={cols} scope={scope} canEdit={canEdit} onCert={onCert} colBands={colBands} segColor={segColor}
       onEmpty={(ci,slot)=>onCell(sede,theAula,ci,slot)} onBlock={onBlock} /></div>);
 }
-function GridDayAll({day,occ,hitQT,canEdit,onCell,onBlock}){
+function GridDayAll({day,occ,hitQT,canEdit,onCell,onBlock,onCert}){
   const cols=[];
   SEDE_NAMES.forEach(s=>{ const aule=SEDI[s].slice(); const i0={}; aule.forEach((a,i)=>i0[a]=i); aule.sort((a,b)=>(floorRank(a)-floorRank(b))||(i0[a]-i0[b])); aule.forEach(a=>cols.push({name:a,floor:floorTok(a),ph:false,sede:s,sedeColor:sedeColor(s)})); });
   const idx={}; cols.forEach((c,i)=>idx[c.sede+"|"+c.name]=i);
   const scope=occ.filter(o=>o.day===day && idx[o.sede+"|"+o.room]!==undefined && hitQT(o)).map(o=>Object.assign({},o,{__col:idx[o.sede+"|"+o.room]}));
-  return <GridCore cols={cols} scope={scope} canEdit={canEdit} segColor="#B0A99A"
+  return <GridCore cols={cols} scope={scope} canEdit={canEdit} onCert={onCert} segColor="#B0A99A"
             onEmpty={(ci,slot)=>onCell(cols[ci].sede,cols[ci].name,day,slot)} onBlock={onBlock} />;
 }
-function WeekGridAule({sede,aula,occ,hitQT,canEdit,onCell,onBlock}){
+function WeekGridAule({sede,aula,occ,hitQT,canEdit,onCell,onBlock,onCert}){
   let cols=colsForSede(sede); if(aula!=="Tutte"){ cols=cols.filter(c=>c.name===aula); }
   return (<div>{aula==="Tutte" && <div className="banner">Quadro settimana di <b>{sede}</b>: giorni in riga, aule in colonna. Clicca una cella per aggiungere, un'attivit&agrave; per modificarla.</div>}
     <div className="grid-card"><div className="grid-scroll"><table>
@@ -853,12 +863,12 @@ function WeekGridAule({sede,aula,occ,hitQT,canEdit,onCell,onBlock}){
         return <td key={ci} className={"wkcell"+(c.ph?" ph":"")+(canEdit?" editable":"")} onClick={canEdit?(()=>onCell(sede,c.name,d,4)):undefined}>
           {items.map(it=>{ const t=typeOf(it.tipo),ink=t.ink;
             return <div key={it.id} className="wkchip" style={{borderLeftColor:t.color,background:hexToRgba(t.color,0.16),color:ink||undefined}} onClick={canEdit?(ev=>{ ev.stopPropagation(); onBlock(it); }):undefined}>
-              <span className="wa">{it.att}</span>{it.att2?<span className="wa2" style={ink?{color:ink}:undefined}>{it.att2}</span>:null}<span className="wt">{slotToTime(it.start)+"\u2013"+slotToTime(it.end)}</span>{perLabel(it.per,it.day)?<span className="wt" style={{fontStyle:"italic"}}>{perLabel(it.per,it.day)}</span>:null}</div>; })}
+              <CertDot o={it} canEdit={canEdit} onCert={onCert} /><span className="wa">{it.att}</span>{it.att2?<span className="wa2" style={ink?{color:ink}:undefined}>{it.att2}</span>:null}<span className="wt">{slotToTime(it.start)+"\u2013"+slotToTime(it.end)}</span>{perLabel(it.per,it.day)?<span className="wt" style={{fontStyle:"italic"}}>{perLabel(it.per,it.day)}</span>:null}</div>; })}
         </td>; })}
     </tr>)}</tbody>
     </table></div></div></div>);
 }
-function ListView({occ,sede,aula,giornoF,hitQT,canEdit,onBlock}){
+function ListView({occ,sede,aula,giornoF,hitQT,canEdit,onBlock,onCert}){
   let rows=occ.filter(o=>{ if(sede!=="Tutte"&&o.sede!==sede) return false; if(aula!=="Tutte"&&o.room!==aula) return false; if(giornoF!=="tutti"&&o.day!==parseInt(giornoF,10)) return false; return hitQT(o); });
   rows.sort((a,b)=> a.sede.localeCompare(b.sede)||a.day-b.day||a.start-b.start||a.room.localeCompare(b.room));
   if(rows.length===0) return <div className="grid-card"><div className="empty-state">Nessuna occupazione corrisponde ai filtri.</div></div>;
@@ -868,7 +878,7 @@ function ListView({occ,sede,aula,giornoF,hitQT,canEdit,onBlock}){
       return <tr key={o.id} onClick={canEdit?(()=>onBlock(o)):undefined}>
         <td><span className="sedepill"><span className="d" style={{background:sedeColor(o.sede)}}></span>{o.sede}</span></td>
         <td>{o.room}</td><td>{DAYS[o.day]}</td><td style={{whiteSpace:"nowrap"}}>{slotToTime(o.start)+"\u2013"+slotToTime(o.end)}</td>
-        <td style={t.ink?{color:t.ink,fontWeight:700}:undefined}>{o.att}{o.att2?<span style={t.ink?{color:t.ink}:{color:"var(--muted)"}}> &middot; {o.att2}</span>:null}{perLabel(o.per,o.day)?<span className="muted" style={{fontStyle:"italic"}}> &middot; {perLabel(o.per,o.day)}</span>:null}</td><td><span className="pill" style={{borderLeftColor:t.color,background:hexToRgba(t.color,0.16),color:t.ink||undefined,fontWeight:t.ink?800:700}}>{t.label}</span></td></tr>; })}</tbody>
+        <td style={t.ink?{color:t.ink,fontWeight:700}:undefined}><CertDot o={o} canEdit={canEdit} onCert={onCert} /> {o.att}{o.att2?<span style={t.ink?{color:t.ink}:{color:"var(--muted)"}}> &middot; {o.att2}</span>:null}{perLabel(o.per,o.day)?<span className="muted" style={{fontStyle:"italic"}}> &middot; {perLabel(o.per,o.day)}</span>:null}</td><td><span className="pill" style={{borderLeftColor:t.color,background:hexToRgba(t.color,0.16),color:t.ink||undefined,fontWeight:t.ink?800:700}}>{t.label}</span></td></tr>; })}</tbody>
   </table></div></div>);
 }
 
