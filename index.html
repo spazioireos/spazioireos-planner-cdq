@@ -208,6 +208,7 @@ function colsForSede(sede){
 function isoToIt(iso){ if(!iso) return ""; const p=iso.split("-"); if(p.length!==3) return iso; return p[2]+"/"+p[1]+"/"+p[0]; }
 function todayISO(){ const d=new Date(); return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()); }
 function uid(p){ return (p||"x")+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+function fid(s){ return String(s).replace(/[\/\\]/g,"-"); }
 function asPeriodDefault(nome){ const m=(nome||"").match(/(\d{4})/); let y=m?parseInt(m[1],10):new Date().getFullYear(); return { inizio:y+"-09-01", fine:(y+1)+"-08-31" }; }
 function dayBeforeISO(iso){ const p=iso.split("-"); const d=new Date(Date.UTC(parseInt(p[0],10),parseInt(p[1],10)-1,parseInt(p[2],10))); d.setUTCDate(d.getUTCDate()-1); return d.getUTCFullYear()+"-"+pad(d.getUTCMonth()+1)+"-"+pad(d.getUTCDate()); }
 
@@ -346,9 +347,9 @@ function App(){
       setAnni(A);setOccAll(O);setSegAll(S); pickDefault(A); return;
     }
     if(!db||!user||!role) return;
-    const u1=db.collection("anni").onSnapshot(s=>{ if(dirtyRef.current) return; const a={}; s.forEach(d=>{ a[d.id]=d.data(); }); setAnni(a); pickDefault(a); },e=>console.error(e));
+    const u1=db.collection("anni").onSnapshot(s=>{ if(dirtyRef.current) return; const a={}; s.forEach(d=>{ const x=d.data()||{}; a[x.nome?x.nome:d.id]=x; }); setAnni(a); pickDefault(a); },e=>console.error(e));
     const u2=db.collection("occupazioni").onSnapshot(s=>{ if(dirtyRef.current) return; const a=[]; s.forEach(d=>{ const o=d.data();o.id=d.id;a.push(o); }); setOccAll(a); },e=>console.error(e));
-    const u3=db.collection("segreteria").onSnapshot(s=>{ if(dirtyRef.current) return; const m={}; s.forEach(d=>{ m[d.id]=d.data().bySede||{}; }); setSegAll(m); },e=>console.error(e));
+    const u3=db.collection("segreteria").onSnapshot(s=>{ if(dirtyRef.current) return; const m={}; s.forEach(d=>{ const x=d.data()||{}; m[x.key?x.key:d.id]=x.bySede||{}; }); setSegAll(m); },e=>console.error(e));
     return ()=>{ u1();u2();u3(); };
   },[user,role]);
 
@@ -388,16 +389,18 @@ function App(){
 
   function saveAll(){
     if(MODE==="demo"){ lsSave(K_ANNI,anni); lsSave(K_OCC,occAll); lsSave(K_SEG,segAll); setDelIds([]); clearDirty(); flash("Tutto salvato"); return; }
-    const ops=[];
-    occAll.forEach(o=>{ if(!o.id) return; ops.push({t:"set",ref:db.collection("occupazioni").doc(o.id), data:{as:o.as,periodo:o.periodo,sede:o.sede,room:o.room,day:o.day,start:o.start,end:o.end,att:o.att,att2:o.att2||"",tipo:o.tipo}}); });
-    delIds.forEach(id=>ops.push({t:"del",ref:db.collection("occupazioni").doc(id)}));
-    if(isAdmin){ Object.keys(anni).forEach(n=>ops.push({t:"set",ref:db.collection("anni").doc(n), data:anni[n]}));
-      Object.keys(segAll).forEach(k=>ops.push({t:"set",ref:db.collection("segreteria").doc(k), data:{bySede:segAll[k]}})); }
-    if(ops.length===0){ setDelIds([]); clearDirty(); flash("Tutto salvato"); return; }
-    let i=0; (function chunk(){ if(i>=ops.length){ setDelIds([]); clearDirty(); flash("Tutto salvato"); return; }
-      const batch=db.batch(); const end=Math.min(i+400,ops.length);
-      for(;i<end;i++){ if(ops[i].t==="del") batch.delete(ops[i].ref); else batch.set(ops[i].ref,ops[i].data,{merge:true}); }
-      batch.commit().then(chunk).catch(e=>alert("Errore durante il salvataggio. Riprova.")); })();
+    try {
+      const ops=[];
+      occAll.forEach(o=>{ if(!o.id) return; ops.push({t:"set",ref:db.collection("occupazioni").doc(fid(String(o.id))), data:{as:o.as||"",periodo:o.periodo||"",sede:o.sede||"",room:o.room||"",day:o.day||0,start:o.start||0,end:o.end||0,att:(o.att||"").trim(),att2:(o.att2||"").trim(),tipo:o.tipo||"corso"}}); });
+      delIds.forEach(id=>ops.push({t:"del",ref:db.collection("occupazioni").doc(fid(String(id)))}));
+      if(isAdmin){ Object.keys(anni).forEach(n=>ops.push({t:"set",ref:db.collection("anni").doc(fid(n)), data:{nome:n,periodi:(anni[n]&&anni[n].periodi)?anni[n].periodi:[]}}));
+        Object.keys(segAll).forEach(k=>ops.push({t:"set",ref:db.collection("segreteria").doc(fid(k)), data:{key:k,bySede:segAll[k]||{}}})); }
+      if(ops.length===0){ setDelIds([]); clearDirty(); flash("Tutto salvato"); return; }
+      let i=0; (function chunk(){ if(i>=ops.length){ setDelIds([]); clearDirty(); flash("Tutto salvato"); return; }
+        const batch=db.batch(); const end=Math.min(i+400,ops.length);
+        for(;i<end;i++){ if(ops[i].t==="del") batch.delete(ops[i].ref); else batch.set(ops[i].ref,ops[i].data,{merge:true}); }
+        batch.commit().then(chunk).catch(function(e){ alert("Salvataggio non riuscito: "+((e&&e.code)?e.code:"")+" "+((e&&e.message)?e.message:e)); }); })();
+    } catch(e){ alert("Salvataggio non riuscito: "+((e&&e.message)?e.message:e)); }
   }
 
   /* persistenza occ (solo in memoria: si salva con Salva) */
