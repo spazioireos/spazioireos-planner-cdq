@@ -71,6 +71,9 @@
   .chip .sw{width:10px;height:10px;border-radius:3px;border:1px solid rgba(0,0,0,.12)}
   .chip[aria-pressed="true"]{border-color:var(--ink);font-weight:700;background:var(--tint)}
   .grow{flex:1 1 auto}
+  .cdqbtn{border:1px solid var(--hair-strong);background:#fff;color:var(--muted);font:inherit;font-size:12.5px;font-weight:700;padding:5px 10px;border-radius:8px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;line-height:1}
+  .cdqbtn:hover{border-color:var(--ink);color:var(--ink)}
+  .cdqbtn .dot{width:10px;height:10px;border-radius:3px;border:1px solid rgba(0,0,0,.15)}
 
   .days{display:flex;flex-wrap:wrap;gap:5px;margin:0 0 8px}
   .day-tab{border:1px solid var(--hair-strong);background:#fff;border-radius:999px;padding:5px 11px;font-size:12.5px;font-weight:600;cursor:pointer}
@@ -98,6 +101,7 @@
   td.block .meta{font-size:10px;color:var(--muted);margin-top:1px;font-variant-numeric:tabular-nums}
   td.block .tp{font-size:10px;font-weight:700}
   td.block .sub{font-size:10px;color:var(--muted);line-height:1.15;overflow:hidden;text-overflow:ellipsis}
+  td.block .per{font-size:9.5px;color:var(--muted);font-style:italic;line-height:1.1}
   .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#1F2430;color:#fff;padding:9px 18px;border-radius:999px;font-size:13px;font-weight:700;box-shadow:0 6px 20px rgba(0,0,0,.25);z-index:80}
   td.block.dim{opacity:.28;filter:grayscale(.4)}
   .cdqtag{display:block;font-size:8.5px;font-weight:800;padding:0 4px;border-radius:3px;margin-bottom:2px;letter-spacing:.02em;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -175,7 +179,7 @@ const SEDI = {
   "Valvassori Peroni": ["Aula A PT","Palestra PT","Aula B PT"]
 };
 const SEDE_NAMES = Object.keys(SEDI);
-const SEDE_COLORS = { "Garibaldi":"#4CAF50", "Gabelle":"#FFA000", "Vigentina":"#FFEB3B", "Scaldasole":"#0288D1", "Valvassori Peroni":"#8E24AA" };
+const SEDE_COLORS = { "Garibaldi":"#2E8B57", "Gabelle":"#FFA000", "Vigentina":"#F0E68C", "Scaldasole":"#0288D1", "Valvassori Peroni":"#8E24AA" };
 const sedeColor = s => SEDE_COLORS[s] || "#C0392B";
 const MIN_COLS = 7;
 
@@ -190,6 +194,15 @@ const typeOf = k => { for(let i=0;i<TYPES.length;i++){ if(TYPES[i].key===k) retu
 
 const DAYS = ["Luned\u00EC","Marted\u00EC","Mercoled\u00EC","Gioved\u00EC","Venerd\u00EC","Sabato","Domenica"];
 const DAYS_SH = ["Lun","Mar","Mer","Gio","Ven","Sab","Dom"];
+const DISC_BASE = ["canto","riunione periodica","socialit\u00E0","sportello ascolto/psicol.","teatro"];
+function perLabel(code,day){ if(!code||code==="sett") return "";
+  if(code==="alt") return "sett. alterne";
+  if(code==="una") return "una tantum";
+  const dn=DAYS_SH[day]||"";
+  if(code==="mU") return "ultimo "+dn+" del mese";
+  const m={m1:"1\u00B0",m2:"2\u00B0",m3:"3\u00B0",m4:"4\u00B0"};
+  return m[code]?(m[code]+" "+dn+" del mese"):"";
+}
 const START_MIN = 8*60, SLOTS = (24-8)*4;
 const pad = n => (n<10?"0":"")+n;
 const slotToTime = i => { const m=START_MIN+i*15; return pad(Math.floor(m/60))+":"+pad(m%60); };
@@ -198,7 +211,7 @@ function hexToRgba(hex,a){ let h=hex.replace("#",""); const r=parseInt(h.substri
 function lumin(hex){ let h=hex.replace("#",""); const f=c=>{ c=c/255; return c<=0.03928?c/12.92:Math.pow((c+0.055)/1.055,2.4); };
   return 0.2126*f(parseInt(h.substring(0,2),16))+0.7152*f(parseInt(h.substring(2,4),16))+0.0722*f(parseInt(h.substring(4,6),16)); }
 const onColor = hex => lumin(hex)>0.55 ? "#1F2430" : "#FFFFFF";
-const SEG_BORDER = 3;
+const SEG_BORDER = 1;
 
 /* piani / colonne */
 function floorTok(name){ const m=name.match(/(PT|\dP)\s*$/i); return m?m[1].toUpperCase():""; }
@@ -320,6 +333,7 @@ function App(){
 
   const [editing,setEditing]=useState(null);
   const [mErr,setMErr]=useState("");
+  const [discOther,setDiscOther]=useState(false);
   const [toast,setToast]=useState("");
   const [dirty,setDirty]=useState(false);
   const [delIds,setDelIds]=useState([]);
@@ -384,6 +398,7 @@ function App(){
   function onPickYear(y){ if(!y) return; if(anni[y]){ setCurAS(y); } else if(isAdmin){ createAS(y,"vuoto"); } }
   const occ=useMemo(()=>occAll.filter(o=>o.as===curAS&&o.periodo===curPer),[occAll,curAS,curPer]);
   const seg=useMemo(()=>segAll[segKey(curAS,curPer)]||{},[segAll,curAS,curPer]);
+  const discOpts=useMemo(()=>{ const set={}; DISC_BASE.forEach(d=>set[d]=1); occAll.forEach(o=>{ if(o.tipo==="esterni"&&o.att2&&o.att2.trim()) set[o.att2.trim()]=1; }); return Object.keys(set).sort((a,b)=>a.localeCompare(b)); },[occAll]);
 
   /* ruoli admin */
   useEffect(()=>{ if(!showRoles) return;
@@ -399,7 +414,7 @@ function App(){
     if(MODE==="demo"){ lsSave(K_ANNI,anni); lsSave(K_OCC,occAll); lsSave(K_SEG,segAll); setDelIds([]); clearDirty(); flash("Tutto salvato"); return; }
     try {
       const ops=[];
-      occAll.forEach(o=>{ if(!o.id) return; ops.push({t:"set",ref:db.collection("occupazioni").doc(fid(String(o.id))), data:{as:o.as||"",periodo:o.periodo||"",sede:o.sede||"",room:o.room||"",day:o.day||0,start:o.start||0,end:o.end||0,att:(o.att||"").trim(),att2:(o.att2||"").trim(),tipo:o.tipo||"corso"}}); });
+      occAll.forEach(o=>{ if(!o.id) return; ops.push({t:"set",ref:db.collection("occupazioni").doc(fid(String(o.id))), data:{as:o.as||"",periodo:o.periodo||"",sede:o.sede||"",room:o.room||"",day:o.day||0,start:o.start||0,end:o.end||0,att:(o.att||"").trim(),att2:(o.att2||"").trim(),per:o.per||"",tipo:o.tipo||"corso"}}); });
       delIds.forEach(id=>ops.push({t:"del",ref:db.collection("occupazioni").doc(fid(String(id)))}));
       if(isAdmin){ Object.keys(anni).forEach(n=>ops.push({t:"set",ref:db.collection("anni").doc(fid(n)), data:{nome:n,periodi:(anni[n]&&anni[n].periodi)?anni[n].periodi:[]}}));
         Object.keys(segAll).forEach(k=>ops.push({t:"set",ref:db.collection("segreteria").doc(fid(k)), data:{key:k,bySede:segAll[k]||{}}})); }
@@ -486,15 +501,15 @@ function App(){
   function segForSedeDay(s,d){ const arr=seg[s]||[]; return arr.filter(x=>x.day===d); }
 
   /* modale occ */
-  function openNew(pSede,pRoom,pDay,pSlot){ setMErr(""); setEditing({id:null,sede:pSede,room:pRoom,day:pDay,start:pSlot,dur:Math.min(4,SLOTS-pSlot),att:"",att2:"",tipo:"corso"}); }
-  function openEdit(o){ if(!canEdit) return; setMErr(""); setEditing({id:o.id,sede:o.sede,room:o.room,day:o.day,start:o.start,dur:o.end-o.start,att:o.att,att2:o.att2?o.att2:"",tipo:o.tipo}); }
+  function openNew(pSede,pRoom,pDay,pSlot){ setMErr(""); setDiscOther(false); setEditing({id:null,sede:pSede,room:pRoom,day:pDay,start:pSlot,dur:Math.min(4,SLOTS-pSlot),att:"",att2:"",per:"",tipo:"corso"}); }
+  function openEdit(o){ if(!canEdit) return; setMErr(""); setDiscOther(false); setEditing({id:o.id,sede:o.sede,room:o.room,day:o.day,start:o.start,dur:o.end-o.start,att:o.att,att2:o.att2?o.att2:"",per:o.per?o.per:"",tipo:o.tipo}); }
   function saveModal(){ const e=editing; if(!e.att||!e.att.trim()){ setMErr(e.tipo==="esterni"?"Inserisci la denominazione.":"Inserisci il nome dell'attivit\u00E0."); return; }
     const start=parseInt(e.start,10),dur=parseInt(e.dur,10),end=start+dur;
     if(dur<1){ setMErr("La durata deve essere almeno 15 minuti."); return; }
     if(end>SLOTS){ setMErr("La durata supera le 24:00."); return; }
     const clash=occ.some(o=>o.id!==e.id&&o.sede===e.sede&&o.room===e.room&&o.day===e.day&&start<o.end&&end>o.start);
     if(clash){ setMErr("Si sovrappone a un'altra occupazione nella stessa aula."); return; }
-    persist({id:e.id,sede:e.sede,room:e.room,day:e.day,start:start,end:end,att:e.att.trim(),att2:(e.att2||"").trim(),tipo:e.tipo}); setEditing(null); flash("Applicato \u2014 premi Salva");
+    persist({id:e.id,sede:e.sede,room:e.room,day:e.day,start:start,end:end,att:e.att.trim(),att2:(e.att2||"").trim(),per:e.per||"",tipo:e.tipo}); setEditing(null); flash("Applicato \u2014 premi Salva");
   }
 
   /* tema schermata per CDQ */
@@ -559,10 +574,11 @@ function App(){
         <button className="seg" aria-pressed={view==="elenco"} onClick={()=>setView("elenco")}>Elenco</button>
         <span className="vsep"></span>
         <div className="fc"><label>Sede</label>
-          <div style={{display:"flex",alignItems:"center",gap:6}}>{sede!=="Tutte" && <span className="sededot" style={{background:sedeColor(sede)}}></span>}
-          <select value={sede} onChange={ev=>{ setSede(ev.target.value); setAula("Tutte"); }}>
-            {view==="elenco" && <option value="Tutte">Tutte le sedi</option>}
-            {SEDE_NAMES.map(s=> <option key={s} value={s}>{s}</option>)}</select></div></div>
+          <div className="chips" style={{gap:6}}>
+            {view==="elenco" && <button className="cdqbtn" style={sede==="Tutte"?{background:"#7B1B02",color:"#fff",borderColor:"#7B1B02"}:undefined} onClick={()=>{ setSede("Tutte"); setAula("Tutte"); }}>Tutte</button>}
+            {SEDE_NAMES.map(s=>{ const on=sede===s; const c=sedeColor(s);
+              return <button key={s} className="cdqbtn" style={on?{background:c,color:onColor(c),borderColor:c}:undefined} onClick={()=>{ setSede(s); setAula("Tutte"); }}>{!on && <span className="dot" style={{background:c}}></span>}{s}</button>; })}
+          </div></div>
         <div className="fc"><label>Aula</label>
           <select value={aula} onChange={ev=>setAula(ev.target.value)} disabled={sede==="Tutte"}>
             <option value="Tutte">Tutte</option>{aule.map(a=> <option key={a} value={a}>{a}</option>)}</select></div>
@@ -599,7 +615,24 @@ function App(){
         <h2>{editing.id?"Modifica occupazione":"Nuova occupazione"}</h2><div className="err">{mErr||"\u00A0"}</div>
         <div className="field"><label>Tipo</label><select value={editing.tipo} onChange={ev=>setEditing(Object.assign({},editing,{tipo:ev.target.value}))}>{TYPES.map(t=> <option key={t.key} value={t.key}>{t.label}</option>)}</select></div>
         <div className="field"><label>{editing.tipo==="esterni"?"Denominazione":"Attivit\u00E0"}</label><input type="text" value={editing.att} maxLength={80} placeholder={editing.tipo==="esterni"?"es. Associazione XY":"es. Corso di spagnolo"} onChange={ev=>setEditing(Object.assign({},editing,{att:ev.target.value}))} /></div>
-        {editing.tipo==="esterni" && <div className="field"><label>Attivit&agrave; svolta (facoltativa)</label><input type="text" value={editing.att2||""} maxLength={80} placeholder="es. laboratorio teatrale" onChange={ev=>setEditing(Object.assign({},editing,{att2:ev.target.value}))} /></div>}
+        {editing.tipo==="esterni" && <div className="field"><label>Attivit&agrave; svolta</label>
+          <select value={discOther?"__ALTRO__":(discOpts.indexOf(editing.att2||"")>=0?editing.att2:(editing.att2?"__ALTRO__":""))} onChange={ev=>{ const v=ev.target.value; if(v==="__ALTRO__"){ setDiscOther(true); setEditing(Object.assign({},editing,{att2:""})); } else { setDiscOther(false); setEditing(Object.assign({},editing,{att2:v})); } }}>
+            <option value="">&mdash; (facoltativa)</option>
+            {discOpts.map(d=> <option key={d} value={d}>{d}</option>)}
+            <option value="__ALTRO__">altro&hellip; (scrivi)</option>
+          </select>
+          {discOther && <input type="text" style={{marginTop:6}} value={editing.att2||""} maxLength={60} placeholder="Scrivi la nuova disciplina" onChange={ev=>setEditing(Object.assign({},editing,{att2:ev.target.value}))} />}
+        </div>}
+        <div className="field"><label>Periodicit&agrave;</label><select value={editing.per||""} onChange={ev=>setEditing(Object.assign({},editing,{per:ev.target.value}))}>
+          <option value="">Ogni settimana</option>
+          <option value="alt">A settimane alterne</option>
+          <option value="m1">1&deg; del mese</option>
+          <option value="m2">2&deg; del mese</option>
+          <option value="m3">3&deg; del mese</option>
+          <option value="m4">4&deg; del mese</option>
+          <option value="mU">Ultimo del mese</option>
+          <option value="una">Una tantum</option>
+        </select></div>
         <div className="row2">
           <div className="field"><label>Sede</label><select value={editing.sede} onChange={ev=>{ const s=ev.target.value; setEditing(Object.assign({},editing,{sede:s,room:colsForSede(s)[0].name})); }}>{SEDE_NAMES.map(s=> <option key={s} value={s}>{s}</option>)}</select></div>
           <div className="field"><label>Aula</label><select value={editing.room} onChange={ev=>setEditing(Object.assign({},editing,{room:ev.target.value}))}>{colsForSede(editing.sede).map(c=> <option key={c.name} value={c.name}>{c.name}{c.floor?(" \u00B7 "+c.floor):""}</option>)}</select></div>
@@ -762,7 +795,7 @@ function GridCore({cols,scope,canEdit,onEmpty,onBlock,railBands,colBands,segColo
     st.borderLeft=SEG_BORDER+"px solid "+segColor; st.borderRight=SEG_BORDER+"px solid "+segColor;
     if(!inBands(bands,slot-1)) st.borderTop=SEG_BORDER+"px solid "+segColor;
     if(!inBands(bands,slot+1)) st.borderBottom=SEG_BORDER+"px solid "+segColor;
-    st.background=hexToRgba(segColor,0.10); return st; }
+    return st; }
   const rows=[];
   for(let r=0;r<SLOTS;r++){
     const isHour=((START_MIN+r*15)%60)===0; const rf=frame(railBands,r);
@@ -773,7 +806,7 @@ function GridCore({cols,scope,canEdit,onEmpty,onBlock,railBands,colBands,segColo
         const style={borderLeftColor:t.color,background:hexToRgba(t.color,0.16)};
         if(inBands(bands,b.start)) style.boxShadow="inset 0 0 0 "+SEG_BORDER+"px "+segColor;
         tds.push(<td key={c} rowSpan={cell.span} className={"block"+(canEdit?" clk":"")} style={style} onClick={canEdit?(()=>onBlock(b)):undefined}>
-          <div className="act" style={ink?{color:ink}:undefined}>{b.att||"(senza titolo)"}</div>{b.att2?<div className="sub" style={ink?{color:ink}:undefined}>{b.att2}</div>:null}<div className="meta">{slotToTime(b.start)+"\u2013"+slotToTime(b.end)}</div><div className="tp" style={{color:ink||t.color}}>{t.label}</div></td>);
+          <div className="act" style={ink?{color:ink}:undefined}>{b.att||"(senza titolo)"}</div>{b.att2?<div className="sub" style={ink?{color:ink}:undefined}>{b.att2}</div>:null}<div className="meta">{slotToTime(b.start)+"\u2013"+slotToTime(b.end)}</div><div className="tp" style={{color:ink||t.color}}>{t.label}</div>{perLabel(b.per,b.day)?<div className="per">{perLabel(b.per,b.day)}</div>:null}</td>);
       } else { const ph=cols[c].ph; const f=frame(bands,r);
         tds.push(<td key={c} className={"cell empty"+(ph?" ph":"")+((canEdit)?" editable":"")} style={f?f:undefined} onClick={canEdit?(()=>onEmpty(c,r)):undefined}></td>);
       }
@@ -820,7 +853,7 @@ function WeekGridAule({sede,aula,occ,hitQT,canEdit,onCell,onBlock}){
         return <td key={ci} className={"wkcell"+(c.ph?" ph":"")+(canEdit?" editable":"")} onClick={canEdit?(()=>onCell(sede,c.name,d,4)):undefined}>
           {items.map(it=>{ const t=typeOf(it.tipo),ink=t.ink;
             return <div key={it.id} className="wkchip" style={{borderLeftColor:t.color,background:hexToRgba(t.color,0.16),color:ink||undefined}} onClick={canEdit?(ev=>{ ev.stopPropagation(); onBlock(it); }):undefined}>
-              <span className="wa">{it.att}</span>{it.att2?<span className="wa2" style={ink?{color:ink}:undefined}>{it.att2}</span>:null}<span className="wt">{slotToTime(it.start)+"\u2013"+slotToTime(it.end)}</span></div>; })}
+              <span className="wa">{it.att}</span>{it.att2?<span className="wa2" style={ink?{color:ink}:undefined}>{it.att2}</span>:null}<span className="wt">{slotToTime(it.start)+"\u2013"+slotToTime(it.end)}</span>{perLabel(it.per,it.day)?<span className="wt" style={{fontStyle:"italic"}}>{perLabel(it.per,it.day)}</span>:null}</div>; })}
         </td>; })}
     </tr>)}</tbody>
     </table></div></div></div>);
@@ -835,7 +868,7 @@ function ListView({occ,sede,aula,giornoF,hitQT,canEdit,onBlock}){
       return <tr key={o.id} onClick={canEdit?(()=>onBlock(o)):undefined}>
         <td><span className="sedepill"><span className="d" style={{background:sedeColor(o.sede)}}></span>{o.sede}</span></td>
         <td>{o.room}</td><td>{DAYS[o.day]}</td><td style={{whiteSpace:"nowrap"}}>{slotToTime(o.start)+"\u2013"+slotToTime(o.end)}</td>
-        <td style={t.ink?{color:t.ink,fontWeight:700}:undefined}>{o.att}{o.att2?<span style={t.ink?{color:t.ink}:{color:"var(--muted)"}}> &middot; {o.att2}</span>:null}</td><td><span className="pill" style={{borderLeftColor:t.color,background:hexToRgba(t.color,0.16),color:t.ink||undefined,fontWeight:t.ink?800:700}}>{t.label}</span></td></tr>; })}</tbody>
+        <td style={t.ink?{color:t.ink,fontWeight:700}:undefined}>{o.att}{o.att2?<span style={t.ink?{color:t.ink}:{color:"var(--muted)"}}> &middot; {o.att2}</span>:null}{perLabel(o.per,o.day)?<span className="muted" style={{fontStyle:"italic"}}> &middot; {perLabel(o.per,o.day)}</span>:null}</td><td><span className="pill" style={{borderLeftColor:t.color,background:hexToRgba(t.color,0.16),color:t.ink||undefined,fontWeight:t.ink?800:700}}>{t.label}</span></td></tr>; })}</tbody>
   </table></div></div>);
 }
 
