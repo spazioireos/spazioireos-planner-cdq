@@ -339,6 +339,7 @@ function App(){
   const [q,setQ]=useState("");
   const [day,setDay]=useState(0);
   const [giornoF,setGiornoF]=useState("tutti");
+  const [certF,setCertF]=useState("tutti");
 
   const [editing,setEditing]=useState(null);
   const [mErr,setMErr]=useState("");
@@ -594,6 +595,8 @@ function App(){
             <option value="Tutte">Tutte</option>{aule.map(a=> <option key={a} value={a}>{a}</option>)}</select></div>
         {view==="elenco" && <div className="fc"><label>Giorno</label>
           <select value={giornoF} onChange={ev=>setGiornoF(ev.target.value)}><option value="tutti">Tutti</option>{DAYS.map((d,i)=> <option key={i} value={i}>{d}</option>)}</select></div>}
+        {view==="elenco" && <div className="fc"><label>Certificazione</label>
+          <select value={certF} onChange={ev=>setCertF(ev.target.value)}><option value="tutti">Tutte</option><option value="none">Da certificare</option><option value="ok">Tutto ok</option><option value="chk">Da verificare</option></select></div>}
         <div className="fc"><label>Cerca</label><input className="search" type="text" value={q} placeholder="es. spagnolo" onChange={ev=>setQ(ev.target.value)} /></div>
         <div className="fc"><label>Tipo</label><div className="chips">{TYPES.map(t=>{ const onx=tipoSet.indexOf(t.key)>=0;
           return <span key={t.key} className="chip" aria-pressed={onx} style={t.ink?{color:t.ink,fontWeight:700}:undefined} onClick={()=>setTipoSet(p=>onx?p.filter(k=>k!==t.key):p.concat([t.key]))}><span className="sw" style={{background:t.color}}></span>{t.label}</span>; })}</div></div>
@@ -611,7 +614,7 @@ function App(){
       {view==="giornotutte" && <GridDayAll day={day} occ={occ} hitQT={hitQT} canEdit={canEdit} onCell={openNew} onBlock={openEdit} onCert={cycleCert} />}
       {view==="settimana" && sede!=="Tutte" && <GridWeek sede={sede} aula={aula} occ={occ} hitQT={hitQT} seg={seg[sede]||[]} segColor={sedeColor(sede)} canEdit={canEdit} onCell={openNew} onBlock={openEdit} onCert={cycleCert} />}
       {view==="settaule" && sede!=="Tutte" && <WeekGridAule sede={sede} aula={aula} occ={occ} hitQT={hitQT} canEdit={canEdit} onCell={openNew} onBlock={openEdit} onCert={cycleCert} />}
-      {view==="elenco" && <ListView occ={occ} sede={sede} aula={aula} giornoF={giornoF} hitQT={hitQT} canEdit={canEdit} onBlock={openEdit} onCert={cycleCert} />}
+      {view==="elenco" && <ListView occ={occ} sede={sede} aula={aula} giornoF={giornoF} certF={certF} hitQT={hitQT} canEdit={canEdit} onBlock={openEdit} onCert={cycleCert} />}
       <div className="legend">{TYPES.map(t=> <span key={t.key} className="it" style={t.ink?{color:t.ink,fontWeight:700}:undefined}><span className="sw" style={{background:t.color}}></span>{t.label}</span>)}
         <span className="it"><span className="frm" style={{border:SEG_BORDER+"px solid "+sedeColor(sede==="Tutte"?"Garibaldi":sede)}}></span>cornice = segreteria</span></div>
     </>}
@@ -874,8 +877,8 @@ function WeekGridAule({sede,aula,occ,hitQT,canEdit,onCell,onBlock,onCert}){
     </table></div></div></div>);
 }
 function fmtH(min){ const h=Math.floor(min/60), m=min%60; return m?(h+"h "+(m<10?"0"+m:m)+"m"):(h+"h"); }
-function ListView({occ,sede,aula,giornoF,hitQT,canEdit,onBlock,onCert}){
-  let rows=occ.filter(o=>{ if(sede!=="Tutte"&&o.sede!==sede) return false; if(aula!=="Tutte"&&o.room!==aula) return false; if(giornoF!=="tutti"&&o.day!==parseInt(giornoF,10)) return false; return hitQT(o); });
+function ListView({occ,sede,aula,giornoF,certF,hitQT,canEdit,onBlock,onCert}){
+  let rows=occ.filter(o=>{ if(sede!=="Tutte"&&o.sede!==sede) return false; if(aula!=="Tutte"&&o.room!==aula) return false; if(giornoF!=="tutti"&&o.day!==parseInt(giornoF,10)) return false; if(certF&&certF!=="tutti"){ const c=o.cert||""; if(certF==="none"?c!=="":c!==certF) return false; } return hitQT(o); });
   rows.sort((a,b)=> a.sede.localeCompare(b.sede)||a.day-b.day||a.start-b.start||a.room.localeCompare(b.room));
   if(rows.length===0) return <div className="grid-card"><div className="empty-state">Nessuna occupazione corrisponde ai filtri.</div></div>;
   const totMin={}; rows.forEach(o=>{ totMin[o.tipo]=(totMin[o.tipo]||0)+(o.end-o.start)*15; });
