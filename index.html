@@ -106,6 +106,11 @@
   .certdot.clk{cursor:pointer}
   td.block .certdot{position:absolute;top:3px;right:3px;z-index:2}
   .wkchip .certdot{margin-right:5px}
+  .totbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:10px 12px;border-top:1px solid var(--hair);background:#FBF9F4}
+  .totbar .totlbl{font-weight:800;font-size:13px}
+  .totchip{font-size:12.5px;display:inline-flex;align-items:center;gap:5px}
+  .totchip.tot{font-weight:800}
+  .totbar .sw{width:11px;height:11px;border-radius:3px;display:inline-block}
   .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#1F2430;color:#fff;padding:9px 18px;border-radius:999px;font-size:13px;font-weight:700;box-shadow:0 6px 20px rgba(0,0,0,.25);z-index:80}
   td.block.dim{opacity:.28;filter:grayscale(.4)}
   .cdqtag{display:block;font-size:8.5px;font-weight:800;padding:0 4px;border-radius:3px;margin-bottom:2px;letter-spacing:.02em;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -805,7 +810,7 @@ function GridCore({cols,scope,canEdit,onEmpty,onBlock,onCert,railBands,colBands,
     st.borderLeft=SEG_BORDER+"px solid "+segColor; st.borderRight=SEG_BORDER+"px solid "+segColor;
     if(!inBands(bands,slot-1)) st.borderTop=SEG_BORDER+"px solid "+segColor;
     if(!inBands(bands,slot+1)) st.borderBottom=SEG_BORDER+"px solid "+segColor;
-    return st; }
+    st.background=hexToRgba(segColor,0.13); return st; }
   const rows=[];
   for(let r=0;r<SLOTS;r++){
     const isHour=((START_MIN+r*15)%60)===0; const rf=frame(railBands,r);
@@ -868,10 +873,13 @@ function WeekGridAule({sede,aula,occ,hitQT,canEdit,onCell,onBlock,onCert}){
     </tr>)}</tbody>
     </table></div></div></div>);
 }
+function fmtH(min){ const h=Math.floor(min/60), m=min%60; return m?(h+"h "+(m<10?"0"+m:m)+"m"):(h+"h"); }
 function ListView({occ,sede,aula,giornoF,hitQT,canEdit,onBlock,onCert}){
   let rows=occ.filter(o=>{ if(sede!=="Tutte"&&o.sede!==sede) return false; if(aula!=="Tutte"&&o.room!==aula) return false; if(giornoF!=="tutti"&&o.day!==parseInt(giornoF,10)) return false; return hitQT(o); });
   rows.sort((a,b)=> a.sede.localeCompare(b.sede)||a.day-b.day||a.start-b.start||a.room.localeCompare(b.room));
   if(rows.length===0) return <div className="grid-card"><div className="empty-state">Nessuna occupazione corrisponde ai filtri.</div></div>;
+  const totMin={}; rows.forEach(o=>{ totMin[o.tipo]=(totMin[o.tipo]||0)+(o.end-o.start)*15; });
+  let grand=0; TYPES.forEach(t=>{ grand+=(totMin[t.key]||0); });
   return (<div className="grid-card"><div className="grid-scroll"><table className="list">
     <thead><tr><th>Sede</th><th>Aula</th><th>Giorno</th><th>Orario</th><th>Attivit&agrave;</th><th>Tipo</th></tr></thead>
     <tbody>{rows.map(o=>{ const t=typeOf(o.tipo);
@@ -879,7 +887,13 @@ function ListView({occ,sede,aula,giornoF,hitQT,canEdit,onBlock,onCert}){
         <td><span className="sedepill"><span className="d" style={{background:sedeColor(o.sede)}}></span>{o.sede}</span></td>
         <td>{o.room}</td><td>{DAYS[o.day]}</td><td style={{whiteSpace:"nowrap"}}>{slotToTime(o.start)+"\u2013"+slotToTime(o.end)}</td>
         <td style={t.ink?{color:t.ink,fontWeight:700}:undefined}><CertDot o={o} canEdit={canEdit} onCert={onCert} /> {o.att}{o.att2?<span style={t.ink?{color:t.ink}:{color:"var(--muted)"}}> &middot; {o.att2}</span>:null}{perLabel(o.per,o.day)?<span className="muted" style={{fontStyle:"italic"}}> &middot; {perLabel(o.per,o.day)}</span>:null}</td><td><span className="pill" style={{borderLeftColor:t.color,background:hexToRgba(t.color,0.16),color:t.ink||undefined,fontWeight:t.ink?800:700}}>{t.label}</span></td></tr>; })}</tbody>
-  </table></div></div>);
+  </table></div>
+  <div className="totbar">
+    <span className="totlbl">Totale ore per tipologia (filtro corrente):</span>
+    {TYPES.map(t=> <span key={t.key} className="totchip"><span className="sw" style={{background:t.color}}></span>{t.label}: <b style={t.ink?{color:t.ink}:undefined}>{fmtH(totMin[t.key]||0)}</b></span>)}
+    <span className="totchip tot">&middot; Totale: <b>{fmtH(grand)}</b></span>
+  </div>
+  </div>);
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
