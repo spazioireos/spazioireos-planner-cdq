@@ -110,6 +110,7 @@
   .flag.paid,.lflag.paid{background:#FBEBD7;color:#B26A00}
   .flag.ris,.lflag.ris{background:#F6E3DD;color:#7B1B02}
   .lflag{font-size:10px;font-weight:800;padding:1px 5px;border-radius:3px;margin-left:6px;white-space:nowrap}
+  .weekhdr{font-weight:800;font-size:14px;padding:4px 10px;margin:2px 0 4px;border-left:4px solid #888;background:#F5F2EB;border-radius:4px}
   .certdot{display:inline-block;width:12px;height:12px;border-radius:50%;border:2px solid #B0AAA0;background:transparent;box-sizing:border-box;vertical-align:middle}
   .certdot.clk{cursor:pointer}
   td.block .certdot{position:absolute;top:3px;right:3px;z-index:2}
@@ -196,7 +197,7 @@ const SEDI = {
   "Valvassori Peroni": ["Aula A PT","Palestra PT","Aula B PT"]
 };
 const SEDE_NAMES = Object.keys(SEDI);
-const SEDE_COLORS = { "Garibaldi":"#2E8B57", "Gabelle":"#FFA000", "Vigentina":"#F0E68C", "Scaldasole":"#0288D1", "Valvassori Peroni":"#8E24AA" };
+const SEDE_COLORS = { "Garibaldi":"#2E8B57", "Gabelle":"#CD5700", "Vigentina":"#F0E68C", "Scaldasole":"#0288D1", "Valvassori Peroni":"#8E24AA" };
 const sedeColor = s => SEDE_COLORS[s] || "#C0392B";
 const MIN_COLS = 7;
 
@@ -865,13 +866,18 @@ function GridDay({sede,aula,day,occ,hitQT,canEdit,onCell,onBlock,onCert,segBands
             onEmpty={(ci,slot)=>onCell(sede,cols[ci].name,day,slot)} onBlock={onBlock} />;
 }
 function GridWeek({sede,aula,occ,hitQT,canEdit,onCell,onBlock,onCert,seg,segColor}){
-  const allCols=colsForSede(sede); const theAula=(aula!=="Tutte")?aula:allCols[0].name;
   const cols=[0,1,2,3,4,5,6].map(d=>({name:DAYS[d],floor:"",ph:false,_d:d}));
-  const scope=occ.filter(o=>o.sede===sede&&o.room===theAula&&hitQT(o)).map(o=>Object.assign({},o,{__col:o.day}));
   const colBands=(ci)=> seg.filter(x=>x.day===ci);
-  return (<div>{aula==="Tutte" && <div className="banner">Vista settimana: aula <b>{theAula}</b>. Per un&apos;altra aula scegli dal filtro <b>Aula</b>.</div>}
-    <GridCore cols={cols} scope={scope} canEdit={canEdit} onCert={onCert} colBands={colBands} segColor={segColor}
-      onEmpty={(ci,slot)=>onCell(sede,theAula,ci,slot)} onBlock={onBlock} /></div>);
+  function weekFor(room){ const scope=occ.filter(o=>o.sede===sede&&o.room===room&&hitQT(o)).map(o=>Object.assign({},o,{__col:o.day}));
+    return <GridCore cols={cols} scope={scope} canEdit={canEdit} onCert={onCert} colBands={colBands} segColor={segColor} onEmpty={(ci,slot)=>onCell(sede,room,ci,slot)} onBlock={onBlock} />; }
+  if(aula!=="Tutte") return <div>{weekFor(aula)}</div>;
+  const known=colsForSede(sede).filter(c=>!c.ph).map(c=>c.name);
+  const extra=[]; occ.forEach(o=>{ if(o.sede===sede && known.indexOf(o.room)<0 && extra.indexOf(o.room)<0) extra.push(o.room); });
+  const allAule=known.concat(extra);
+  return (<div><div className="banner">Vista settimana di <b>{sede}</b>: una tabella per ogni aula. Per vederne una sola, scegli dal filtro <b>Aula</b>.</div>
+    {allAule.map(room=> <div key={room} style={{marginBottom:14}}>
+      <div className="weekhdr" style={{borderLeftColor:segColor}}>{room}</div>
+      {weekFor(room)}</div>)}</div>);
 }
 function GridDayAll({day,occ,hitQT,canEdit,onCell,onBlock,onCert}){
   const cols=[];
