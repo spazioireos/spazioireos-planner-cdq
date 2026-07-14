@@ -838,13 +838,9 @@ function CertDot({o,canEdit,onCert}){ const c=o.cert||""; const col=certColor(c)
   return <span className={"certdot"+(canEdit?" clk":"")} title={title} style={col?{background:col,borderColor:col}:undefined} onClick={canEdit?(ev=>{ ev.stopPropagation(); onCert(o); }):undefined}></span>;
 }
 function GridCore({cols,scope,canEdit,onEmpty,onBlock,onCert,railBands,colBands,segColor}){
-  railBands=railBands||[]; const cb=colBands||function(){return [];};
+  railBands=railBands||[]; const cb=colBands||function(){return railBands;};
   const occMat=buildOcc(cols,scope);
-  function frame(bands,slot){ if(!inBands(bands,slot)) return null; const st={};
-    st.borderLeft=SEG_BORDER+"px solid "+segColor; st.borderRight=SEG_BORDER+"px solid "+segColor;
-    if(!inBands(bands,slot-1)) st.borderTop=SEG_BORDER+"px solid "+segColor;
-    if(!inBands(bands,slot+1)) st.borderBottom=SEG_BORDER+"px solid "+segColor;
-    st.background=hexToRgba(segColor,0.13); return st; }
+  function frame(bands,slot){ if(!inBands(bands,slot)) return null; return {background:hexToRgba(segColor,0.08)}; }
   const rows=[];
   for(let r=0;r<SLOTS;r++){
     const isHour=((START_MIN+r*15)%60)===0; const rf=frame(railBands,r);
@@ -853,7 +849,6 @@ function GridCore({cols,scope,canEdit,onEmpty,onBlock,onCert,railBands,colBands,
       if(cell&&cell.kind==="cov") continue;
       if(cell&&cell.kind==="start"){ const b=cell.b,t=typeOf(b.tipo),ink=t.ink;
         const style={borderLeftColor:t.color,background:hexToRgba(t.color,0.16)};
-        if(inBands(bands,b.start)) style.boxShadow="inset 0 0 0 "+SEG_BORDER+"px "+segColor;
         tds.push(<td key={c} rowSpan={cell.span} className={"block"+(canEdit?" clk":"")} style={style} onClick={canEdit?(()=>onBlock(b)):undefined}>{onCert?<CertDot o={b} canEdit={canEdit} onCert={onCert} />:null}
           <div className="act" style={ink?{color:ink}:undefined}>{b.att||"(senza titolo)"}</div>{b.att2?<div className="sub" style={ink?{color:ink}:undefined}>{b.att2}</div>:null}<div className="meta">{slotToTime(b.start)+"\u2013"+slotToTime(b.end)}</div><div className="tp" style={{color:ink||t.color}}>{t.label}</div>{perLabel(b.per,b.day)?<div className="per">{perLabel(b.per,b.day)}</div>:null}{b.ins?<div className="ins">docente: {b.ins}</div>:null}{(b.pay||b.ris||(hasIns(b.tipo)&&!b.insDef))?<div className="flags">{b.pay==="free"?<span className="flag free">gratuito</span>:null}{b.pay==="paid"?<span className="flag paid">a pagamento</span>:null}{b.ris?<span className="flag ris">riservato{b.risA?": "+b.risA:""}</span>:null}{(hasIns(b.tipo)&&!b.insDef)?<span className="flag def">docente da definire</span>:null}</div>:null}</td>);
       } else { const ph=cols[c].ph; const f=frame(bands,r);
