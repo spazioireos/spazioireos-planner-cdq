@@ -90,7 +90,9 @@
   thead th.th0{left:0;z-index:6}
   .time-col{position:sticky;left:0;z-index:4;background:#F7F5EF;color:var(--muted);font-variant-numeric:tabular-nums;font-size:11px;white-space:nowrap;padding:0 8px;width:60px;min-width:60px}
   tbody tr{height:22px}
-  tbody td.time-col{height:22px;line-height:22px}
+  tbody td.time-col{height:22px;line-height:1;vertical-align:top}
+  td.time-col .tl{display:inline-block;transform:translateY(-50%)}
+  tr.gspacer td{height:11px;padding:0}
   tr.hour td{border-top:1px solid var(--hair-strong)}
   tr.hour td.time-col{color:var(--ink);font-weight:700;font-size:12px}
   td.cell{padding:0;min-width:112px}
@@ -214,8 +216,6 @@ const typeOf = k => { for(let i=0;i<TYPES.length;i++){ if(TYPES[i].key===k) retu
 
 const DAYS = ["Luned\u00EC","Marted\u00EC","Mercoled\u00EC","Gioved\u00EC","Venerd\u00EC","Sabato","Domenica"];
 const DAYS_SH = ["Lun","Mar","Mer","Gio","Ven","Sab","Dom"];
-const DAY_COLORS = ["#1E90FF","#FF8C00","#FF00FF","#6A5ACD","#32CD32","#FFC0CB","#DC143C"];
-function dayColor(d){ return DAY_COLORS[d]||"#333"; }
 const DISC_BASE = ["canto","riunione periodica","socialit\u00E0","sportello ascolto/psicol.","teatro"];
 function perLabel(code,day){ if(!code||code==="sett") return "";
   if(code==="alt") return "sett. alterne";
@@ -630,7 +630,7 @@ function App(){
     {page==="home" && <HomeView seg={seg} periodi={periodi} curPer={curPer} isAdmin={isAdmin} onEditSede={s=>setSegEdit(s)} goCal={s=>{ if(s)setSede(s); setPage("cal"); setView("giorno"); }} />}
 
     {page==="cal" && !noAS && <>
-      {(view==="giorno"||view==="giornotutte") && <div className="days">{DAYS.map((d,i)=> <button key={i} className="day-tab" aria-pressed={i===day} style={i===day?undefined:{color:dayColor(i)}} onClick={()=>setDay(i)}>{d}</button>)}</div>}
+      {(view==="giorno"||view==="giornotutte") && <div className="days">{DAYS.map((d,i)=> <button key={i} className="day-tab" aria-pressed={i===day} onClick={()=>setDay(i)}>{d}</button>)}</div>}
       {(view==="giorno"||view==="settimana"||view==="settaule") && sede==="Tutte" && <div className="grid-card"><div className="empty-state">Seleziona una sede per la griglia, oppure usa <b>Tutte le CDQ</b> o <b>Elenco</b>.</div></div>}
       {view==="giorno" && sede!=="Tutte" && <GridDay sede={sede} aula={aula} day={day} occ={occ} hitQT={hitQT} segBands={segForSedeDay(sede,day)} segColor={sedeColor(sede)} canEdit={canEdit} onCell={openNew} onBlock={openEdit} onCert={cycleCert} />}
       {view==="giornotutte" && <GridDayAll day={day} occ={occ} hitQT={hitQT} canEdit={canEdit} onCell={openNew} onBlock={openEdit} onCert={cycleCert} />}
@@ -678,11 +678,11 @@ function App(){
         <div className="field"><label className="chkline"><input type="checkbox" checked={!!editing.ris} onChange={ev=>setEditing(Object.assign({},editing,{ris:ev.target.checked}))} /> <span>Riservato</span></label></div>
         {editing.ris && <div className="field"><label>A chi &egrave; riservato</label><input type="text" value={editing.risA||""} maxLength={80} placeholder="es. minori 6-10 anni / soci / donne" onChange={ev=>setEditing(Object.assign({},editing,{risA:ev.target.value}))} /></div>}
         <div className="row2">
-          <div className="field"><label>Sede</label><select value={editing.sede} style={{color:sedeColor(editing.sede),fontWeight:700}} onChange={ev=>{ const s=ev.target.value; setEditing(Object.assign({},editing,{sede:s,room:colsForSede(s)[0].name})); }}>{SEDE_NAMES.map(s=> <option key={s} value={s} style={{color:sedeColor(s)}}>{s}</option>)}</select></div>
+          <div className="field"><label>Sede</label><select value={editing.sede} onChange={ev=>{ const s=ev.target.value; setEditing(Object.assign({},editing,{sede:s,room:colsForSede(s)[0].name})); }}>{SEDE_NAMES.map(s=> <option key={s} value={s}>{s}</option>)}</select></div>
           <div className="field"><label>Aula</label><select value={editing.room} onChange={ev=>setEditing(Object.assign({},editing,{room:ev.target.value}))}>{colsForSede(editing.sede).map(c=> <option key={c.name} value={c.name}>{c.name}{c.floor?(" \u00B7 "+c.floor):""}</option>)}</select></div>
         </div>
         <div className="row3">
-          <div className="field"><label>Giorno</label><select value={editing.day} style={{color:dayColor(editing.day),fontWeight:700}} onChange={ev=>setEditing(Object.assign({},editing,{day:parseInt(ev.target.value,10)}))}>{DAYS.map((d,i)=> <option key={i} value={i} style={{color:dayColor(i)}}>{d}</option>)}</select></div>
+          <div className="field"><label>Giorno</label><select value={editing.day} onChange={ev=>setEditing(Object.assign({},editing,{day:parseInt(ev.target.value,10)}))}>{DAYS.map((d,i)=> <option key={i} value={i}>{d}</option>)}</select></div>
           <div className="field"><label>Inizio</label><select value={editing.start} onChange={ev=>{ const s=parseInt(ev.target.value,10); setEditing(Object.assign({},editing,{start:s,dur:Math.min(editing.dur,SLOTS-s)})); }}>{Array.apply(null,{length:SLOTS}).map((x,i)=> <option key={i} value={i}>{slotToTime(i)}</option>)}</select></div>
           <div className="field"><label>Durata</label><select value={editing.dur} onChange={ev=>setEditing(Object.assign({},editing,{dur:parseInt(ev.target.value,10)}))}>{Array.apply(null,{length:SLOTS-editing.start}).map((x,i)=> <option key={i} value={i+1}>{durLabel(i+1)}</option>)}</select></div>
         </div>
@@ -848,7 +848,7 @@ function GridCore({cols,scope,canEdit,onEmpty,onBlock,onCert,railBands,colBands,
   const rows=[];
   for(let r=0;r<SLOTS;r++){
     const isHour=((START_MIN+r*15)%60)===0; const rf=frame(railBands,r);
-    const tds=[<td key="t" className="time-col" style={rf?rf:{}}>{slotToTime(r)}</td>];
+    const tds=[<td key="t" className="time-col" style={rf?rf:{}}><span className="tl">{slotToTime(r)}</span></td>];
     for(let c=0;c<cols.length;c++){ const cell=occMat[c][r]; const bands=cb(c);
       if(cell&&cell.kind==="cov") continue;
       if(cell&&cell.kind==="start"){ const b=cell.b,t=typeOf(b.tipo),ink=t.ink;
@@ -863,8 +863,8 @@ function GridCore({cols,scope,canEdit,onEmpty,onBlock,onCert,railBands,colBands,
     rows.push(<tr key={r} className={isHour?"hour":""}>{tds}</tr>);
   }
   return (<div className="grid-card"><div className="grid-scroll"><table>
-    <thead><tr><th className="th0 time-col">Ora</th>{cols.map((c,i)=> <th key={i} className={c.ph?"ph":""} style={Object.assign({}, c.sedeColor?{background:hexToRgba(c.sedeColor,0.14)}:{}, c.hcolor?{color:c.hcolor}:{})}>{c.sede?<span className="cdqtag" style={{background:c.sedeColor,color:onColor(c.sedeColor)}}>{c.sede}</span>:null}{c.name}{c.floor?<span className="fl">{c.floor}</span>:(c.ph?<span className="fl">libera</span>:null)}</th>)}</tr></thead>
-    <tbody>{rows}</tbody></table></div></div>);
+    <thead><tr><th className="th0 time-col">Ora</th>{cols.map((c,i)=> <th key={i} className={c.ph?"ph":""} style={c.sedeColor?{background:hexToRgba(c.sedeColor,0.14)}:undefined}>{c.sede?<span className="cdqtag" style={{background:c.sedeColor,color:onColor(c.sedeColor)}}>{c.sede}</span>:null}{c.name}{c.floor?<span className="fl">{c.floor}</span>:(c.ph?<span className="fl">libera</span>:null)}</th>)}</tr></thead>
+    <tbody><tr className="gspacer"><td className="time-col"></td>{cols.map((c,i)=> <td key={i}></td>)}</tr>{rows}</tbody></table></div></div>);
 }
 
 function GridDay({sede,aula,day,occ,hitQT,canEdit,onCell,onBlock,onCert,segBands,segColor}){
@@ -875,7 +875,7 @@ function GridDay({sede,aula,day,occ,hitQT,canEdit,onCell,onBlock,onCert,segBands
             onEmpty={(ci,slot)=>onCell(sede,cols[ci].name,day,slot)} onBlock={onBlock} />;
 }
 function GridWeek({sede,aula,occ,hitQT,canEdit,onCell,onBlock,onCert,seg,segColor}){
-  const cols=[0,1,2,3,4,5,6].map(d=>({name:DAYS[d],floor:"",ph:false,_d:d,hcolor:dayColor(d)}));
+  const cols=[0,1,2,3,4,5,6].map(d=>({name:DAYS[d],floor:"",ph:false,_d:d}));
   const colBands=(ci)=> seg.filter(x=>x.day===ci);
   function weekFor(room){ const scope=occ.filter(o=>o.sede===sede&&o.room===room&&hitQT(o)).map(o=>Object.assign({},o,{__col:o.day}));
     return <GridCore cols={cols} scope={scope} canEdit={canEdit} onCert={onCert} colBands={colBands} segColor={segColor} onEmpty={(ci,slot)=>onCell(sede,room,ci,slot)} onBlock={onBlock} />; }
@@ -902,7 +902,7 @@ function WeekGridAule({sede,aula,occ,hitQT,canEdit,onCell,onBlock,onCert}){
     <div className="grid-card"><div className="grid-scroll"><table>
     <thead><tr><th className="th0 time-col">Giorno</th>{cols.map((c,i)=> <th key={i} className={c.ph?"ph":""}>{c.name}{c.floor?<span className="fl">{c.floor}</span>:(c.ph?<span className="fl">libera</span>:null)}</th>)}</tr></thead>
     <tbody>{DAYS.map((dn,d)=> <tr key={d}>
-      <td className="time-col daycol" style={{color:dayColor(d)}}>{DAYS_SH[d]}</td>
+      <td className="time-col daycol">{DAYS_SH[d]}</td>
       {cols.map((c,ci)=>{ const items=occ.filter(o=>o.sede===sede&&o.room===c.name&&o.day===d&&hitQT(o)).sort((a,b)=>a.start-b.start);
         return <td key={ci} className={"wkcell"+(c.ph?" ph":"")+(canEdit?" editable":"")} onClick={canEdit?(()=>onCell(sede,c.name,d,4)):undefined}>
           {items.map(it=>{ const t=typeOf(it.tipo),ink=t.ink;
@@ -914,7 +914,7 @@ function WeekGridAule({sede,aula,occ,hitQT,canEdit,onCell,onBlock,onCert}){
 }
 function fmtH(min){ const h=Math.floor(min/60), m=min%60; return m?(h+"h "+(m<10?"0"+m:m)+"m"):(h+"h"); }
 function isStructured(tipo){ return tipo==="corso"||tipo==="altra"||tipo==="esterni"; }
-function hasIns(tipo){ return tipo==="corso"||tipo==="altra"||tipo==="sportello"; }
+function hasIns(tipo){ return tipo==="corso"||tipo==="sportello"; }
 function nowStamp(){ const d=new Date(); const p={}; (new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Rome',day:'2-digit',month:'short',year:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false})).formatToParts(d).forEach(x=>p[x.type]=x.value);
   const mesi={Jan:'gen',Feb:'feb',Mar:'mar',Apr:'apr',May:'mag',Jun:'giu',Jul:'lug',Aug:'ago',Sep:'set',Oct:'ott',Nov:'nov',Dec:'dic'}; return p.day+(mesi[p.month]||p.month.toLowerCase())+p.year+" - "+p.hour+"."+p.minute; }
 function exportExcel(rows){
@@ -938,7 +938,7 @@ function ListView({occ,sede,aula,giornoF,certF,risF,payF,insF,hitQT,canEdit,onBl
     <tbody>{rows.map(o=>{ const t=typeOf(o.tipo);
       return <tr key={o.id} onClick={canEdit?(()=>onBlock(o)):undefined}>
         <td><span className="sedepill"><span className="d" style={{background:sedeColor(o.sede)}}></span>{o.sede}</span></td>
-        <td>{o.room}</td><td style={{color:dayColor(o.day),fontWeight:700}}>{DAYS[o.day]}</td><td style={{whiteSpace:"nowrap"}}>{slotToTime(o.start)+"\u2013"+slotToTime(o.end)}</td>
+        <td>{o.room}</td><td>{DAYS[o.day]}</td><td style={{whiteSpace:"nowrap"}}>{slotToTime(o.start)+"\u2013"+slotToTime(o.end)}</td>
         <td style={t.ink?{color:t.ink,fontWeight:700}:undefined}><CertDot o={o} canEdit={canEdit} onCert={onCert} /> {o.att}{o.att2?<span style={t.ink?{color:t.ink}:{color:"var(--muted)"}}> &middot; {o.att2}</span>:null}{o.ins?<span className="muted"> &middot; docente: {o.ins}</span>:null}{perLabel(o.per,o.day)?<span className="muted" style={{fontStyle:"italic"}}> &middot; {perLabel(o.per,o.day)}</span>:null}{o.pay==="free"?<span className="lflag free">gratuito</span>:null}{o.pay==="paid"?<span className="lflag paid">a pagamento</span>:null}{o.ris?<span className="lflag ris">riservato{o.risA?": "+o.risA:""}</span>:null}{(hasIns(o.tipo)&&!o.insDef)?<span className="lflag def">docente da definire</span>:null}</td><td><span className="pill" style={{borderLeftColor:t.color,background:hexToRgba(t.color,0.16),color:t.ink||undefined,fontWeight:t.ink?800:700}}>{t.label}</span></td></tr>; })}</tbody>
   </table></div>
   <div className="totbar">
