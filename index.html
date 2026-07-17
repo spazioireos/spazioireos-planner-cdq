@@ -402,6 +402,7 @@ function App(){
     return ()=>{ u1();u2();u3(); };
   },[user,role]);
 
+  useEffect(()=>{ if(view==="settimana" && aula==="Tutte" && sede!=="Tutte"){ const list=SEDI[sede]||[]; if(list.length>0) setAula(colsForSede(sede)[0].name); } },[view,aula,sede]);
   useEffect(()=>{ function h(e){ if(dirtyRef.current){ e.preventDefault(); e.returnValue=""; return ""; } } window.addEventListener("beforeunload",h); return ()=>window.removeEventListener("beforeunload",h); },[]);
 
   function pickDefault(A){
@@ -595,11 +596,11 @@ function App(){
       <button className="seg" aria-pressed={page==="cal"} onClick={()=>setPage("cal")}>Calendario</button>
       {page==="cal" && <>
         <span className="vsep"></span>
-        <button className="seg" aria-pressed={view==="giorno"} onClick={()=>setView("giorno")}>Giorno</button>
-        <button className="seg" aria-pressed={view==="giornotutte"} onClick={()=>setView("giornotutte")}>Tutte le CDQ</button>
-        <button className="seg" aria-pressed={view==="settimana"} onClick={()=>setView("settimana")}>Settimana</button>
-        <button className="seg" aria-pressed={view==="settaule"} onClick={()=>setView("settaule")}>Quadro sett.</button>
-        <button className="seg" aria-pressed={view==="elenco"} onClick={()=>setView("elenco")}>Elenco</button>
+        <button className="seg" aria-pressed={view==="giorno"} onClick={()=>setView("giorno")}>Giornata per aule</button>
+        <button className="seg" aria-pressed={view==="giornotutte"} onClick={()=>setView("giornotutte")}>Giornata di tutte le CDQ</button>
+        <button className="seg" aria-pressed={view==="settimana"} onClick={()=>setView("settimana")}>Settimana di una singola aula</button>
+        <button className="seg" aria-pressed={view==="settaule"} onClick={()=>setView("settaule")}>Settimana della CDQ (colpo d'occhio)</button>
+        <button className="seg" aria-pressed={view==="elenco"} onClick={()=>setView("elenco")}>Elenco filtrabile</button>
         <span className="vsep"></span>
         <div className="fc"><label>Sede</label>
           <div className="chips" style={{gap:6}}>
@@ -609,7 +610,7 @@ function App(){
           </div></div>
         <div className="fc"><label>Aula</label>
           <select value={aula} onChange={ev=>setAula(ev.target.value)} disabled={sede==="Tutte"}>
-            <option value="Tutte">Tutte</option>{aule.map(a=> <option key={a} value={a}>{a}</option>)}</select></div>
+            {view!=="settimana" && <option value="Tutte">Tutte</option>}{aule.map(a=> <option key={a} value={a}>{a}</option>)}</select></div>
         {view==="elenco" && <div className="fc"><label>Giorno</label>
           <select value={giornoF} onChange={ev=>setGiornoF(ev.target.value)}><option value="tutti">Tutti</option>{DAYS.map((d,i)=> <option key={i} value={i}>{d}</option>)}</select></div>}
         {view==="elenco" && <div className="fc"><label>Certificazione</label>
@@ -632,7 +633,7 @@ function App(){
 
     {page==="cal" && !noAS && <>
       {(view==="giorno"||view==="giornotutte") && <div className="days">{DAYS.map((d,i)=> <button key={i} className="day-tab" aria-pressed={i===day} onClick={()=>setDay(i)}>{d}</button>)}</div>}
-      {(view==="giorno"||view==="settimana"||view==="settaule") && sede==="Tutte" && <div className="grid-card"><div className="empty-state">Seleziona una sede per la griglia, oppure usa <b>Tutte le CDQ</b> o <b>Elenco</b>.</div></div>}
+      {(view==="giorno"||view==="settimana"||view==="settaule") && sede==="Tutte" && <div className="grid-card"><div className="empty-state">Seleziona una CDQ per la griglia, oppure usa <b>Giornata di tutte le CDQ</b> o <b>Elenco filtrabile</b>.</div></div>}
       {view==="giorno" && sede!=="Tutte" && <GridDay sede={sede} aula={aula} day={day} occ={occ} hitQT={hitQT} segBands={segForSedeDay(sede,day)} segColor={sedeColor(sede)} canEdit={canEdit} onCell={openNew} onBlock={openEdit} onCert={cycleCert} />}
       {view==="giornotutte" && <GridDayAll day={day} occ={occ} hitQT={hitQT} canEdit={canEdit} onCell={openNew} onBlock={openEdit} onCert={cycleCert} />}
       {view==="settimana" && sede!=="Tutte" && <GridWeek sede={sede} aula={aula} occ={occ} hitQT={hitQT} seg={seg[sede]||[]} segColor={sedeColor(sede)} canEdit={canEdit} onCell={openNew} onBlock={openEdit} onCert={cycleCert} />}
@@ -873,16 +874,13 @@ function GridDay({sede,aula,day,occ,hitQT,canEdit,onCell,onBlock,onCert,segBands
 function GridWeek({sede,aula,occ,hitQT,canEdit,onCell,onBlock,onCert,seg,segColor}){
   const cols=[0,1,2,3,4,5,6].map(d=>({name:DAYS[d],floor:"",ph:false,_d:d}));
   const colBands=(ci)=> seg.filter(x=>x.day===ci);
-  function weekFor(room){ const scope=occ.filter(o=>o.sede===sede&&o.room===room&&hitQT(o)).map(o=>Object.assign({},o,{__col:o.day}));
-    return <GridCore cols={cols} scope={scope} canEdit={canEdit} onCert={onCert} colBands={colBands} segColor={segColor} onEmpty={(ci,slot)=>onCell(sede,room,ci,slot)} onBlock={onBlock} />; }
-  if(aula!=="Tutte") return <div>{weekFor(aula)}</div>;
-  const known=colsForSede(sede).filter(c=>!c.ph).map(c=>c.name);
-  const extra=[]; occ.forEach(o=>{ if(o.sede===sede && known.indexOf(o.room)<0 && extra.indexOf(o.room)<0) extra.push(o.room); });
-  const allAule=known.concat(extra);
-  return (<div><div className="banner">Vista settimana di <b>{sede}</b>: una tabella per ogni aula. Per vederne una sola, scegli dal filtro <b>Aula</b>.</div>
-    {allAule.map(room=> <div key={room} style={{marginBottom:14}}>
-      <div className="weekhdr" style={{borderLeftColor:segColor}}>{room}</div>
-      {weekFor(room)}</div>)}</div>);
+  const room=(aula!=="Tutte")?aula:colsForSede(sede)[0].name;
+  const scope=occ.filter(o=>o.sede===sede&&o.room===room&&hitQT(o)).map(o=>Object.assign({},o,{__col:o.day}));
+  return (<div>
+    <div className="banner">Settimana di <b>{sede}</b> &middot; aula <b>{room}</b>. Per un&apos;altra aula usa il filtro <b>Aula</b>; per il quadro d&apos;insieme usa <b>Settimana della CDQ (colpo d&apos;occhio)</b>.</div>
+    <div className="weekhdr" style={{borderLeftColor:segColor}}>{room}</div>
+    <GridCore cols={cols} scope={scope} canEdit={canEdit} onCert={onCert} colBands={colBands} segColor={segColor} onEmpty={(ci,slot)=>onCell(sede,room,ci,slot)} onBlock={onBlock} />
+  </div>);
 }
 function GridDayAll({day,occ,hitQT,canEdit,onCell,onBlock,onCert}){
   const cols=[];
