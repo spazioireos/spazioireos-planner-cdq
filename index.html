@@ -73,6 +73,8 @@
   .chip[aria-pressed="true"]{border-color:var(--ink);font-weight:700;background:var(--tint)}
   .grow{flex:1 1 auto}
   .cdqbtn{border:1px solid var(--hair-strong);background:#fff;color:var(--muted);font:inherit;font-size:12.5px;font-weight:700;padding:5px 10px;border-radius:8px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;line-height:1}
+  .cdqbtn.off{opacity:.5;text-decoration:line-through}
+  .cdqbtn.off:hover{opacity:.8}
   .cdqbtn:hover{border-color:var(--ink);color:var(--ink)}
   .cdqbtn .dot{width:10px;height:10px;border-radius:3px;border:1px solid rgba(0,0,0,.15)}
 
@@ -346,13 +348,13 @@ function App(){
   const [curPer,setCurPer]=useState("");
 
   const [page,setPage]=useState("home");
-  const [view,setView]=useState("giorno");
-  const [sede,setSede]=useState("Garibaldi");
-  const [aula,setAula]=useState("Tutte");
-  const [tipoSet,setTipoSet]=useState([]);
+  const [view,setView]=useState("griglia");
+  const [sedeSel,setSedeSel]=useState(SEDE_NAMES.slice());
+  const [tipoSel,setTipoSel]=useState(TYPES.map(function(t){return t.key;}));
+  const [aulaOff,setAulaOff]=useState([]);
   const [q,setQ]=useState("");
   const [day,setDay]=useState(0);
-  const [giornoF,setGiornoF]=useState("tutti");
+  const [giornoSet,setGiornoSet]=useState([0,1,2,3,4,5,6]);
   const [certF,setCertF]=useState("tutti");
   const [risF,setRisF]=useState("tutti");
   const [payF,setPayF]=useState("tutti");
@@ -402,7 +404,6 @@ function App(){
     return ()=>{ u1();u2();u3(); };
   },[user,role]);
 
-  useEffect(()=>{ if(view==="settimana" && aula==="Tutte" && sede!=="Tutte"){ const list=SEDI[sede]||[]; if(list.length>0) setAula(colsForSede(sede)[0].name); } },[view,aula,sede]);
   useEffect(()=>{ function h(e){ if(dirtyRef.current){ e.preventDefault(); e.returnValue=""; return ""; } } window.addEventListener("beforeunload",h); return ()=>window.removeEventListener("beforeunload",h); },[]);
 
   function pickDefault(A){
@@ -525,8 +526,12 @@ function App(){
   }
 
   /* filtri */
-  const aule = sede==="Tutte" ? [] : SEDI[sede];
-  function hitQT(o){ if(tipoSet.length>0&&tipoSet.indexOf(o.tipo)<0) return false; if(q&&(o.att||"").toLowerCase().indexOf(q.toLowerCase())<0) return false; return true; }
+  function sedeOn(s){ return sedeSel.indexOf(s)>=0; }
+  function tipoOn(k){ return tipoSel.indexOf(k)>=0; }
+  function aulaOn(s,r){ return sedeOn(s) && aulaOff.indexOf(s+"|"+r)<0; }
+  const gridSede = sedeSel.length>0 ? sedeSel[0] : SEDE_NAMES[0];
+  const auleBtns=[]; SEDE_NAMES.forEach(function(s){ if(sedeOn(s)){ colsForSede(s).forEach(function(c){ if(!c.ph) auleBtns.push({sede:s,name:c.name}); }); } });
+  function hitQT(o){ if(!tipoOn(o.tipo)) return false; if(q&&(o.att||"").toLowerCase().indexOf(q.toLowerCase())<0) return false; return true; }
   function segForSedeDay(s,d){ const arr=seg[s]||[]; return arr.filter(x=>x.day===d); }
 
   /* modale occ */
@@ -542,7 +547,7 @@ function App(){
   }
 
   /* tema schermata per CDQ */
-  const activeSede = (page==="cal" && sede!=="Tutte") ? sede : null;
+  const activeSede = (page==="cal" && sedeSel.length===1) ? sedeSel[0] : null;
   const sc = activeSede ? sedeColor(activeSede) : "#7B1B02";
   const on = onColor(sc);
   const themeVars = { "--accent":sc, "--on":on, "--accent-ink":sc, "--tint":hexToRgba(sc,0.14) };
@@ -596,23 +601,27 @@ function App(){
       <button className="seg" aria-pressed={page==="cal"} onClick={()=>setPage("cal")}>Calendario</button>
       {page==="cal" && <>
         <span className="vsep"></span>
-        <button className="seg" aria-pressed={view==="giorno"} onClick={()=>setView("giorno")}>Giornata per aule</button>
-        <button className="seg" aria-pressed={view==="giornotutte"} onClick={()=>setView("giornotutte")}>Giornata di tutte le CDQ</button>
-        <button className="seg" aria-pressed={view==="settimana"} onClick={()=>setView("settimana")}>Settimana di una singola aula</button>
+        <button className="seg" aria-pressed={view==="griglia"} onClick={()=>setView("griglia")}>Griglia</button>
         <button className="seg" aria-pressed={view==="settaule"} onClick={()=>setView("settaule")}>Settimana della CDQ (colpo d'occhio)</button>
         <button className="seg" aria-pressed={view==="elenco"} onClick={()=>setView("elenco")}>Elenco filtrabile</button>
         <span className="vsep"></span>
         <div className="fc"><label>Sede</label>
           <div className="chips" style={{gap:6}}>
-            {view==="elenco" && <button className="cdqbtn" style={sede==="Tutte"?{background:"#7B1B02",color:"#fff",borderColor:"#7B1B02"}:undefined} onClick={()=>{ setSede("Tutte"); setAula("Tutte"); }}>Tutte</button>}
-            {SEDE_NAMES.map(s=>{ const on=sede===s; const c=sedeColor(s);
-              return <button key={s} className="cdqbtn" style={on?{background:c,color:onColor(c),borderColor:c}:undefined} onClick={()=>{ setSede(s); setAula("Tutte"); }}>{!on && <span className="dot" style={{background:c}}></span>}{s}</button>; })}
+            {SEDE_NAMES.map(s=>{ const on=sedeOn(s); const c=sedeColor(s);
+              return <button key={s} className={"cdqbtn"+(on?"":" off")} style={on?{background:c,color:onColor(c),borderColor:c}:undefined} onClick={()=>setSedeSel(p=>on?p.filter(x=>x!==s):p.concat([s]))}><span className="dot" style={{background:c}}></span>{s}</button>; })}
           </div></div>
-        <div className="fc"><label>Aula</label>
-          <select value={aula} onChange={ev=>setAula(ev.target.value)} disabled={sede==="Tutte"}>
-            {view!=="settimana" && <option value="Tutte">Tutte</option>}{aule.map(a=> <option key={a} value={a}>{a}</option>)}</select></div>
+        {view==="griglia" && <div className="fc"><label>Giorno</label>
+          <div className="chips" style={{gap:6}}>{DAYS.map((d,i)=>{ const on=day===i; const c=DAY_COLORS[i];
+            return <button key={i} className={"cdqbtn"+(on?"":" off")} style={on?{background:c,color:onColor(c),borderColor:c}:undefined} onClick={()=>setDay(i)}><span className="dot" style={{background:c}}></span>{d}</button>; })}</div></div>}
         {view==="elenco" && <div className="fc"><label>Giorno</label>
-          <select value={giornoF} onChange={ev=>setGiornoF(ev.target.value)}><option value="tutti">Tutti</option>{DAYS.map((d,i)=> <option key={i} value={i}>{d}</option>)}</select></div>}
+          <div className="chips" style={{gap:6}}>{DAYS.map((d,i)=>{ const on=giornoSet.indexOf(i)>=0; const c=DAY_COLORS[i];
+            return <button key={i} className={"cdqbtn"+(on?"":" off")} style={on?{background:c,color:onColor(c),borderColor:c}:undefined} onClick={()=>setGiornoSet(p=>on?p.filter(x=>x!==i):p.concat([i]))}><span className="dot" style={{background:c}}></span>{d}</button>; })}</div></div>}
+        <div className="fc"><label>Tipologia</label>
+          <div className="chips" style={{gap:6}}>{TYPES.map(t=>{ const on=tipoOn(t.key);
+            return <button key={t.key} className={"cdqbtn"+(on?"":" off")} style={on?{background:t.color,color:t.ink||onColor(t.color),borderColor:t.color}:undefined} onClick={()=>setTipoSel(p=>on?p.filter(x=>x!==t.key):p.concat([t.key]))}><span className="dot" style={{background:t.color}}></span>{t.label}</button>; })}</div></div>
+        {view!=="settaule" && <div className="fc"><label>Aula</label>
+          <div className="chips" style={{gap:6}}>{auleBtns.map(a=>{ const k=a.sede+"|"+a.name; const off=aulaOff.indexOf(k)>=0; const c=sedeColor(a.sede);
+            return <button key={k} className={"cdqbtn"+(off?" off":"")} onClick={()=>setAulaOff(p=>off?p.filter(x=>x!==k):p.concat([k]))}><span className="dot" style={{background:c}}></span>{a.name}</button>; })}</div></div>}
         {view==="elenco" && <div className="fc"><label>Certificazione</label>
           <select value={certF} onChange={ev=>setCertF(ev.target.value)}><option value="tutti">Tutte</option><option value="none">Da certificare</option><option value="ok">Tutto ok</option><option value="chk">Da verificare</option></select></div>}
         {view==="elenco" && <div className="fc"><label>Riservato</label>
@@ -622,25 +631,19 @@ function App(){
         {view==="elenco" && <div className="fc"><label>Insegnante</label>
           <select value={insF} onChange={ev=>setInsF(ev.target.value)}><option value="tutti">Tutti</option><option value="def">Definito</option><option value="nodef">Da definire</option></select></div>}
         <div className="fc"><label>Cerca</label><input className="search" type="text" value={q} placeholder="es. spagnolo" onChange={ev=>setQ(ev.target.value)} /></div>
-        <div className="fc"><label>Tipo</label><div className="chips">{TYPES.map(t=>{ const onx=tipoSet.indexOf(t.key)>=0;
-          return <span key={t.key} className="chip" aria-pressed={onx} style={t.ink?{color:t.ink,fontWeight:700}:undefined} onClick={()=>setTipoSet(p=>onx?p.filter(k=>k!==t.key):p.concat([t.key]))}><span className="sw" style={{background:t.color}}></span>{t.label}</span>; })}</div></div>
         <span className="grow"></span>
-        {canEdit && !noAS && <button className="btn primary" onClick={()=>{ const s=sede==="Tutte"?SEDE_NAMES[0]:sede; const r=(aula!=="Tutte")?aula:SEDI[s][0]; openNew(s,r,(view==="giorno"||view==="giornotutte")?day:0,4); }}>+ Occupazione</button>}
+        {canEdit && !noAS && <button className="btn primary" onClick={()=>{ const s=gridSede; const r=SEDI[s][0]; openNew(s,r,day,4); }}>+ Occupazione</button>}
       </>}
     </div>
 
-    {page==="home" && <HomeView seg={seg} periodi={periodi} curPer={curPer} isAdmin={isAdmin} onEditSede={s=>setSegEdit(s)} goCal={s=>{ if(s)setSede(s); setPage("cal"); setView("giorno"); }} />}
+    {page==="home" && <HomeView seg={seg} periodi={periodi} curPer={curPer} isAdmin={isAdmin} onEditSede={s=>setSegEdit(s)} goCal={s=>{ if(s)setSedeSel([s]); setPage("cal"); setView("griglia"); }} />}
 
     {page==="cal" && !noAS && <>
-      {(view==="giorno"||view==="giornotutte") && <div className="days">{DAYS.map((d,i)=> <button key={i} className="day-tab" aria-pressed={i===day} onClick={()=>setDay(i)}>{d}</button>)}</div>}
-      {(view==="giorno"||view==="settimana"||view==="settaule") && sede==="Tutte" && <div className="grid-card"><div className="empty-state">Seleziona una CDQ per la griglia, oppure usa <b>Giornata di tutte le CDQ</b> o <b>Elenco filtrabile</b>.</div></div>}
-      {view==="giorno" && sede!=="Tutte" && <GridDay sede={sede} aula={aula} day={day} occ={occ} hitQT={hitQT} segBands={segForSedeDay(sede,day)} segColor={sedeColor(sede)} canEdit={canEdit} onCell={openNew} onBlock={openEdit} onCert={cycleCert} />}
-      {view==="giornotutte" && <GridDayAll day={day} occ={occ} hitQT={hitQT} canEdit={canEdit} onCell={openNew} onBlock={openEdit} onCert={cycleCert} />}
-      {view==="settimana" && sede!=="Tutte" && <GridWeek sede={sede} aula={aula} occ={occ} hitQT={hitQT} seg={seg[sede]||[]} segColor={sedeColor(sede)} canEdit={canEdit} onCell={openNew} onBlock={openEdit} onCert={cycleCert} />}
-      {view==="settaule" && sede!=="Tutte" && <WeekGridAule sede={sede} aula={aula} occ={occ} hitQT={hitQT} canEdit={canEdit} onCell={openNew} onBlock={openEdit} onCert={cycleCert} />}
-      {view==="elenco" && <ListView occ={occ} sede={sede} aula={aula} giornoF={giornoF} certF={certF} risF={risF} payF={payF} insF={insF} hitQT={hitQT} canEdit={canEdit} onBlock={openEdit} onCert={cycleCert} />}
+      {view==="griglia" && <Griglia day={day} occ={occ} hitQT={hitQT} sedeSel={sedeSel} aulaOn={aulaOn} railBands={sedeSel.length===1?segForSedeDay(sedeSel[0],day):null} segColor={sedeSel.length===1?sedeColor(sedeSel[0]):"#B0A99A"} canEdit={canEdit} onCell={openNew} onBlock={openEdit} onCert={cycleCert} />}
+      {view==="settaule" && <WeekGridAule sede={gridSede} aulaOn={aulaOn} occ={occ} hitQT={hitQT} canEdit={canEdit} onCell={openNew} onBlock={openEdit} onCert={cycleCert} />}
+      {view==="elenco" && <ListView occ={occ} sedeSel={sedeSel} aulaOn={aulaOn} giornoSet={giornoSet} certF={certF} risF={risF} payF={payF} insF={insF} hitQT={hitQT} canEdit={canEdit} onBlock={openEdit} onCert={cycleCert} />}
       <div className="legend">{TYPES.map(t=> <span key={t.key} className="it" style={t.ink?{color:t.ink,fontWeight:700}:undefined}><span className="sw" style={{background:t.color}}></span>{t.label}</span>)}
-        <span className="it"><span className="frm" style={{border:SEG_BORDER+"px solid "+sedeColor(sede==="Tutte"?"Garibaldi":sede)}}></span>cornice = segreteria</span></div>
+        <span className="it"><span className="sw" style={{background:hexToRgba(sedeColor(gridSede),0.35)}}></span>tinta = orario di segreteria</span></div>
     </>}
 
     <footer className="app">Documento di Christian &mdash; Spazio Ireos soc. coop. sociale ETS &middot; settimana tipo &middot; 15&nbsp;min 8:00&ndash;24:00</footer>
@@ -882,17 +885,18 @@ function GridWeek({sede,aula,occ,hitQT,canEdit,onCell,onBlock,onCert,seg,segColo
     <GridCore cols={cols} scope={scope} canEdit={canEdit} onCert={onCert} colBands={colBands} segColor={segColor} onEmpty={(ci,slot)=>onCell(sede,room,ci,slot)} onBlock={onBlock} />
   </div>);
 }
-function GridDayAll({day,occ,hitQT,canEdit,onCell,onBlock,onCert}){
+function Griglia({day,occ,hitQT,sedeSel,aulaOn,railBands,segColor,canEdit,onCell,onBlock,onCert}){
   const cols=[];
-  SEDE_NAMES.forEach(s=>{ const aule=SEDI[s].slice(); const i0={}; aule.forEach((a,i)=>i0[a]=i); aule.sort((a,b)=>(floorRank(a)-floorRank(b))||(i0[a]-i0[b])); aule.forEach(a=>cols.push({name:a,floor:floorTok(a),ph:false,sede:s,sedeColor:sedeColor(s)})); });
+  SEDE_NAMES.forEach(s=>{ if(sedeSel.indexOf(s)<0) return; const aule=SEDI[s].slice(); const i0={}; aule.forEach((a,i)=>i0[a]=i); aule.sort((a,b)=>(floorRank(a)-floorRank(b))||(i0[a]-i0[b])); aule.forEach(a=>{ if(aulaOn(s,a)) cols.push({name:a,floor:floorTok(a),ph:false,sede:s,sedeColor:sedeColor(s)}); }); });
+  if(cols.length===0) return <div className="grid-card"><div className="empty-state">Nessuna aula da mostrare: accendi almeno una <b>Sede</b> e un&apos;<b>Aula</b> dai pulsantoni qui sopra.</div></div>;
   const idx={}; cols.forEach((c,i)=>idx[c.sede+"|"+c.name]=i);
   const scope=occ.filter(o=>o.day===day && idx[o.sede+"|"+o.room]!==undefined && hitQT(o)).map(o=>Object.assign({},o,{__col:idx[o.sede+"|"+o.room]}));
-  return <GridCore cols={cols} scope={scope} canEdit={canEdit} onCert={onCert} segColor="#B0A99A"
+  return <GridCore cols={cols} scope={scope} canEdit={canEdit} onCert={onCert} railBands={railBands||[]} segColor={segColor||"#B0A99A"}
             onEmpty={(ci,slot)=>onCell(cols[ci].sede,cols[ci].name,day,slot)} onBlock={onBlock} />;
 }
-function WeekGridAule({sede,aula,occ,hitQT,canEdit,onCell,onBlock,onCert}){
-  let cols=colsForSede(sede); if(aula!=="Tutte"){ cols=cols.filter(c=>c.name===aula); }
-  return (<div>{aula==="Tutte" && <div className="banner">Quadro settimana di <b>{sede}</b>: giorni in riga, aule in colonna. Clicca una cella per aggiungere, un'attivit&agrave; per modificarla.</div>}
+function WeekGridAule({sede,aulaOn,occ,hitQT,canEdit,onCell,onBlock,onCert}){
+  let cols=colsForSede(sede).filter(c=>c.ph||aulaOn(sede,c.name));
+  return (<div><div className="banner">Quadro settimana di <b>{sede}</b>: giorni in riga, aule in colonna. Deseleziona <b>Sede</b>/<b>Aula</b> dai pulsantoni per filtrare; se hai pi&ugrave; CDQ accese qui vedi la prima. Clicca una cella per aggiungere, un&apos;attivit&agrave; per modificarla.</div>
     <div className="grid-card"><div className="grid-scroll"><table>
     <thead><tr><th className="th0 time-col">Giorno</th>{cols.map((c,i)=> <th key={i} className={c.ph?"ph":""}>{c.name}{c.floor?<span className="fl">{c.floor}</span>:(c.ph?<span className="fl">libera</span>:null)}</th>)}</tr></thead>
     <tbody>{DAYS.map((dn,d)=> <tr key={d}>
@@ -919,8 +923,8 @@ function exportExcel(rows){
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"Occupazioni");
   XLSX.writeFile(wb, "Calendario CDQ Spazio Ireos - Elenco "+nowStamp()+".xlsx");
 }
-function ListView({occ,sede,aula,giornoF,certF,risF,payF,insF,hitQT,canEdit,onBlock,onCert}){
-  let rows=occ.filter(o=>{ if(sede!=="Tutte"&&o.sede!==sede) return false; if(aula!=="Tutte"&&o.room!==aula) return false; if(giornoF!=="tutti"&&o.day!==parseInt(giornoF,10)) return false; if(certF&&certF!=="tutti"){ const c=o.cert||""; if(certF==="none"?c!=="":c!==certF) return false; } if(risF==="si"&&!o.ris) return false; if(risF==="no"&&o.ris) return false; if(payF&&payF!=="tutti"){ const pp=o.pay||""; if(payF==="none"?pp!=="":pp!==payF) return false; } if(insF==="def"&&!(hasIns(o.tipo)&&o.insDef)) return false; if(insF==="nodef"&&!(hasIns(o.tipo)&&!o.insDef)) return false; return hitQT(o); });
+function ListView({occ,sedeSel,aulaOn,giornoSet,certF,risF,payF,insF,hitQT,canEdit,onBlock,onCert}){
+  let rows=occ.filter(o=>{ if(sedeSel.indexOf(o.sede)<0) return false; if(!aulaOn(o.sede,o.room)) return false; if(giornoSet.indexOf(o.day)<0) return false; if(certF&&certF!=="tutti"){ const c=o.cert||""; if(certF==="none"?c!=="":c!==certF) return false; } if(risF==="si"&&!o.ris) return false; if(risF==="no"&&o.ris) return false; if(payF&&payF!=="tutti"){ const pp=o.pay||""; if(payF==="none"?pp!=="":pp!==payF) return false; } if(insF==="def"&&!(hasIns(o.tipo)&&o.insDef)) return false; if(insF==="nodef"&&!(hasIns(o.tipo)&&!o.insDef)) return false; return hitQT(o); });
   rows.sort((a,b)=> a.sede.localeCompare(b.sede)||a.day-b.day||a.start-b.start||a.room.localeCompare(b.room));
   if(rows.length===0) return <div className="grid-card"><div className="empty-state">Nessuna occupazione corrisponde ai filtri.</div></div>;
   const totMin={}; rows.forEach(o=>{ totMin[o.tipo]=(totMin[o.tipo]||0)+(o.end-o.start)*15; });
