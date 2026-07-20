@@ -73,8 +73,11 @@
   .chip[aria-pressed="true"]{border-color:var(--ink);font-weight:700;background:var(--tint)}
   .grow{flex:1 1 auto}
   .cdqbtn{border:1px solid var(--hair-strong);background:#fff;color:var(--muted);font:inherit;font-size:12.5px;font-weight:700;padding:5px 10px;border-radius:8px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;line-height:1}
-  .cdqbtn.off{opacity:.5;text-decoration:line-through}
-  .cdqbtn.off:hover{opacity:.8}
+  .cdqbtn.off{opacity:.55}
+  .cdqbtn.off:hover{opacity:.85}
+  .cdqbtn .mk{font-weight:900;font-size:11px}
+  .anbtn{font-size:10.5px;font-weight:800;border:1px solid var(--hair-strong);background:#F3F1EA;color:var(--muted);border-radius:6px;padding:4px 7px;cursor:pointer}
+  .anbtn:hover{border-color:var(--ink);color:var(--ink)}
   .cdqbtn:hover{border-color:var(--ink);color:var(--ink)}
   .cdqbtn .dot{width:10px;height:10px;border-radius:3px;border:1px solid rgba(0,0,0,.15)}
 
@@ -607,21 +610,28 @@ function App(){
         <span className="vsep"></span>
         <div className="fc"><label>Sede</label>
           <div className="chips" style={{gap:6}}>
+            <button className="anbtn" onClick={()=>setSedeSel(SEDE_NAMES.slice())}>Tutte</button><button className="anbtn" onClick={()=>setSedeSel([])}>Nessuna</button>
             {SEDE_NAMES.map(s=>{ const on=sedeOn(s); const c=sedeColor(s);
-              return <button key={s} className={"cdqbtn"+(on?"":" off")} style={on?{background:c,color:onColor(c),borderColor:c}:undefined} onClick={()=>setSedeSel(p=>on?p.filter(x=>x!==s):p.concat([s]))}><span className="dot" style={{background:c}}></span>{s}</button>; })}
+              return <button key={s} className={"cdqbtn"+(on?"":" off")} style={on?{background:c,color:onColor(c),borderColor:c}:undefined} onClick={()=>setSedeSel(p=>on?p.filter(x=>x!==s):p.concat([s]))}><span className="mk">{on?"\u2713":"\u25CB"}</span>{!on && <span className="dot" style={{background:c}}></span>}{s}</button>; })}
           </div></div>
         {view==="griglia" && <div className="fc"><label>Giorno</label>
           <div className="chips" style={{gap:6}}>{DAYS.map((d,i)=>{ const on=day===i; const c=DAY_COLORS[i];
-            return <button key={i} className={"cdqbtn"+(on?"":" off")} style={on?{background:c,color:onColor(c),borderColor:c}:undefined} onClick={()=>setDay(i)}><span className="dot" style={{background:c}}></span>{d}</button>; })}</div></div>}
+            return <button key={i} className={"cdqbtn"+(on?"":" off")} style={on?{background:c,color:onColor(c),borderColor:c}:undefined} onClick={()=>setDay(i)}><span className="mk">{on?"\u2713":"\u25CB"}</span>{!on && <span className="dot" style={{background:c}}></span>}{d}</button>; })}</div></div>}
         {view==="elenco" && <div className="fc"><label>Giorno</label>
-          <div className="chips" style={{gap:6}}>{DAYS.map((d,i)=>{ const on=giornoSet.indexOf(i)>=0; const c=DAY_COLORS[i];
-            return <button key={i} className={"cdqbtn"+(on?"":" off")} style={on?{background:c,color:onColor(c),borderColor:c}:undefined} onClick={()=>setGiornoSet(p=>on?p.filter(x=>x!==i):p.concat([i]))}><span className="dot" style={{background:c}}></span>{d}</button>; })}</div></div>}
+          <div className="chips" style={{gap:6}}>
+            <button className="anbtn" onClick={()=>setGiornoSet([0,1,2,3,4,5,6])}>Tutti</button><button className="anbtn" onClick={()=>setGiornoSet([])}>Nessuno</button>
+            {DAYS.map((d,i)=>{ const on=giornoSet.indexOf(i)>=0; const c=DAY_COLORS[i];
+            return <button key={i} className={"cdqbtn"+(on?"":" off")} style={on?{background:c,color:onColor(c),borderColor:c}:undefined} onClick={()=>setGiornoSet(p=>on?p.filter(x=>x!==i):p.concat([i]))}><span className="mk">{on?"\u2713":"\u25CB"}</span>{!on && <span className="dot" style={{background:c}}></span>}{d}</button>; })}</div></div>}
         <div className="fc"><label>Tipologia</label>
-          <div className="chips" style={{gap:6}}>{TYPES.map(t=>{ const on=tipoOn(t.key);
-            return <button key={t.key} className={"cdqbtn"+(on?"":" off")} style={on?{background:t.color,color:t.ink||onColor(t.color),borderColor:t.color}:undefined} onClick={()=>setTipoSel(p=>on?p.filter(x=>x!==t.key):p.concat([t.key]))}><span className="dot" style={{background:t.color}}></span>{t.label}</button>; })}</div></div>
+          <div className="chips" style={{gap:6}}>
+            <button className="anbtn" onClick={()=>setTipoSel(TYPES.map(t=>t.key))}>Tutte</button><button className="anbtn" onClick={()=>setTipoSel([])}>Nessuna</button>
+            {TYPES.map(t=>{ const on=tipoOn(t.key);
+            return <button key={t.key} className={"cdqbtn"+(on?"":" off")} style={on?{background:t.color,color:t.ink||onColor(t.color),borderColor:t.color}:undefined} onClick={()=>setTipoSel(p=>on?p.filter(x=>x!==t.key):p.concat([t.key]))}><span className="mk">{on?"\u2713":"\u25CB"}</span>{!on && <span className="dot" style={{background:t.color}}></span>}{t.label}</button>; })}</div></div>
         {view!=="settaule" && <div className="fc"><label>Aula</label>
-          <div className="chips" style={{gap:6}}>{auleBtns.map(a=>{ const k=a.sede+"|"+a.name; const off=aulaOff.indexOf(k)>=0; const c=sedeColor(a.sede);
-            return <button key={k} className={"cdqbtn"+(off?" off":"")} onClick={()=>setAulaOff(p=>off?p.filter(x=>x!==k):p.concat([k]))}><span className="dot" style={{background:c}}></span>{a.name}</button>; })}</div></div>}
+          <div className="chips" style={{gap:6}}>
+            <button className="anbtn" onClick={()=>setAulaOff([])}>Tutte</button><button className="anbtn" onClick={()=>setAulaOff(auleBtns.map(a=>a.sede+"|"+a.name))}>Nessuna</button>
+            {auleBtns.map(a=>{ const k=a.sede+"|"+a.name; const on=aulaOff.indexOf(k)<0; const c=sedeColor(a.sede);
+            return <button key={k} className={"cdqbtn"+(on?"":" off")} style={on?{background:c,color:onColor(c),borderColor:c}:undefined} onClick={()=>setAulaOff(p=>on?p.concat([k]):p.filter(x=>x!==k))}><span className="mk">{on?"\u2713":"\u25CB"}</span>{!on && <span className="dot" style={{background:c}}></span>}{a.name}</button>; })}</div></div>}
         {view==="elenco" && <div className="fc"><label>Certificazione</label>
           <select value={certF} onChange={ev=>setCertF(ev.target.value)}><option value="tutti">Tutte</option><option value="none">Da certificare</option><option value="ok">Tutto ok</option><option value="chk">Da verificare</option></select></div>}
         {view==="elenco" && <div className="fc"><label>Riservato</label>
