@@ -855,7 +855,7 @@ function CertDot({o,canEdit,onCert}){ const c=o.cert||""; const col=certColor(c)
 function GridCore({cols,scope,canEdit,onEmpty,onBlock,onCert,railBands,colBands,segColor}){
   railBands=railBands||[]; const cb=colBands||function(){return railBands;};
   const occMat=buildOcc(cols,scope);
-  function frame(bands,slot){ if(!inBands(bands,slot)) return null; return {background:hexToRgba(segColor,0.08)}; }
+  function frame(bands,slot){ if(!inBands(bands,slot)) return null; return {background: segColor==="#F0E68C" ? "#F0ECB6" : hexToRgba(segColor,0.08)}; }
   const rows=[];
   for(let r=0;r<SLOTS;r++){
     const isHour=((START_MIN+r*15)%60)===0; const rf=frame(railBands,r);
