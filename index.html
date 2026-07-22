@@ -855,7 +855,7 @@ function CertDot({o,canEdit,onCert}){ const c=o.cert||""; const col=certColor(c)
 function GridCore({cols,scope,canEdit,onEmpty,onBlock,onCert,railBands,colBands,segColor}){
   railBands=railBands||[]; const cb=colBands||function(){return railBands;};
   const occMat=buildOcc(cols,scope);
-  function frame(bands,slot){ if(!inBands(bands,slot)) return null; return {background: segColor==="#F0E68C" ? "#F0ECB6" : hexToRgba(segColor,0.08)}; }
+  function frame(bands,slot){ if(!inBands(bands,slot)) return null; return {background: segColor==="#F0E68C" ? hexToRgba(segColor,0.38) : hexToRgba(segColor,0.08)}; }
   const rows=[];
   for(let r=0;r<SLOTS;r++){
     const isHour=((START_MIN+r*15)%60)===0; const rf=frame(railBands,r);
@@ -863,7 +863,7 @@ function GridCore({cols,scope,canEdit,onEmpty,onBlock,onCert,railBands,colBands,
     for(let c=0;c<cols.length;c++){ const cell=occMat[c][r]; const bands=cb(c);
       if(cell&&cell.kind==="cov") continue;
       if(cell&&cell.kind==="start"){ const b=cell.b,t=typeOf(b.tipo),ink=t.ink;
-        const style={borderLeftColor:t.color,background:hexToRgba(t.color,0.16)};
+        const style={borderLeftColor:t.color,background:hexToRgba(t.color,t.key==="corso"?0.28:0.16)};
         tds.push(<td key={c} rowSpan={cell.span} className={"block"+(canEdit?" clk":"")} style={style} onClick={canEdit?(()=>onBlock(b)):undefined}>{onCert?<CertDot o={b} canEdit={canEdit} onCert={onCert} />:null}
           <div className="act" style={ink?{color:ink}:undefined}>{b.att||"(senza titolo)"}</div>{b.att2?<div className="sub" style={ink?{color:ink}:undefined}>{b.att2}</div>:null}<div className="meta">{slotToTime(b.start)+"\u2013"+slotToTime(b.end)}</div><div className="tp" style={{color:ink||t.color}}>{t.label}</div>{perLabel(b.per,b.day)?<div className="per">{perLabel(b.per,b.day)}</div>:null}{b.ins?<div className="ins">docente: {b.ins}</div>:null}{(b.pay||b.ris||(hasIns(b.tipo)&&!b.insDef))?<div className="flags">{b.pay==="free"?<span className="flag free">gratuito</span>:null}{b.pay==="paid"?<span className="flag paid">a pagamento</span>:null}{b.ris?<span className="flag ris">riservato{b.risA?": "+b.risA:""}</span>:null}{(hasIns(b.tipo)&&!b.insDef)?<span className="flag def">docente da definire</span>:null}</div>:null}</td>);
       } else { const ph=cols[c].ph; const f=frame(bands,r);
