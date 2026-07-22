@@ -535,6 +535,7 @@ function App(){
   const gridSede = sedeSel.length>0 ? sedeSel[0] : SEDE_NAMES[0];
   const auleBtns=[]; SEDE_NAMES.forEach(function(s){ if(sedeOn(s)){ colsForSede(s).forEach(function(c){ if(!c.ph) auleBtns.push({sede:s,name:c.name}); }); } });
   function hitQT(o){ if(!tipoOn(o.tipo)) return false; if(q&&(o.att||"").toLowerCase().indexOf(q.toLowerCase())<0) return false; return true; }
+  function exportExcelTop(){ const rows=occ.filter(o=> sedeOn(o.sede) && aulaOn(o.sede,o.room) && tipoOn(o.tipo) && (!q||(o.att||"").toLowerCase().indexOf(q.toLowerCase())>=0)); rows.sort((a,b)=> a.sede.localeCompare(b.sede)||a.day-b.day||a.start-b.start||a.room.localeCompare(b.room)); exportExcel(rows); }
   function segForSedeDay(s,d){ const arr=seg[s]||[]; return arr.filter(x=>x.day===d); }
 
   /* modale occ */
@@ -588,6 +589,7 @@ function App(){
       {canEdit && !noAS && dirty && <span className="unsaved" title="Ci sono modifiche non salvate">&bull; non salvato</span>}
       {canEdit && !noAS && <button className={"tbtn save"+(dirty?" pulse":"")} onClick={saveAll}>Salva</button>}
       <button className="tbtn" onClick={exportAll}>Esporta</button>
+      <button className="tbtn" onClick={exportExcelTop}>Esporta Excel</button>
       <button className="tbtn" onClick={()=>fileRef.current&&fileRef.current.click()}>Importa</button>
       <input ref={fileRef} type="file" accept="application/json,.json" style={{display:"none"}} onChange={ev=>{ if(ev.target.files[0]){ importAll(ev.target.files[0]); ev.target.value=""; } }} />
       <span className="who">{user?user.email:""}<span className="pillrole">{MODE==="demo"?"DEMO":(role||"")}</span>
@@ -627,11 +629,11 @@ function App(){
             <button className="anbtn" onClick={()=>setTipoSel(TYPES.map(t=>t.key))}>Tutte</button><button className="anbtn" onClick={()=>setTipoSel([])}>Nessuna</button>
             {TYPES.map(t=>{ const on=tipoOn(t.key);
             return <button key={t.key} className={"cdqbtn"+(on?"":" off")} style={on?{background:t.color,color:t.ink||onColor(t.color),borderColor:t.color}:undefined} onClick={()=>setTipoSel(p=>on?p.filter(x=>x!==t.key):p.concat([t.key]))}><span className="mk">{on?"\u2713":"\u25CB"}</span>{!on && <span className="dot" style={{background:t.color}}></span>}{t.label}</button>; })}</div></div>
-        {view!=="settaule" && <div className="fc"><label>Aula</label>
+        <div className="fc"><label>Aula</label>
           <div className="chips" style={{gap:6}}>
             <button className="anbtn" onClick={()=>setAulaOff([])}>Tutte</button><button className="anbtn" onClick={()=>setAulaOff(auleBtns.map(a=>a.sede+"|"+a.name))}>Nessuna</button>
             {auleBtns.map(a=>{ const k=a.sede+"|"+a.name; const on=aulaOff.indexOf(k)<0; const c=sedeColor(a.sede);
-            return <button key={k} className={"cdqbtn"+(on?"":" off")} style={on?{background:c,color:onColor(c),borderColor:c}:undefined} onClick={()=>setAulaOff(p=>on?p.concat([k]):p.filter(x=>x!==k))}><span className="mk">{on?"\u2713":"\u25CB"}</span>{!on && <span className="dot" style={{background:c}}></span>}{a.name}</button>; })}</div></div>}
+            return <button key={k} className={"cdqbtn"+(on?"":" off")} style={on?{background:c,color:onColor(c),borderColor:c}:undefined} onClick={()=>setAulaOff(p=>on?p.concat([k]):p.filter(x=>x!==k))}><span className="mk">{on?"\u2713":"\u25CB"}</span>{!on && <span className="dot" style={{background:c}}></span>}{a.name}</button>; })}</div></div>
         {view==="elenco" && <div className="fc"><label>Certificazione</label>
           <select value={certF} onChange={ev=>setCertF(ev.target.value)}><option value="tutti">Tutte</option><option value="none">Da certificare</option><option value="ok">Tutto ok</option><option value="chk">Da verificare</option></select></div>}
         {view==="elenco" && <div className="fc"><label>Riservato</label>
