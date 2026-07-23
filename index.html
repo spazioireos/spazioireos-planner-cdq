@@ -364,6 +364,7 @@ function App(){
   const [insF,setInsF]=useState("tutti");
 
   const [editing,setEditing]=useState(null);
+  const [libera,setLibera]=useState(null);
   const [mErr,setMErr]=useState("");
   const [discOther,setDiscOther]=useState(false);
   const [toast,setToast]=useState("");
@@ -535,6 +536,22 @@ function App(){
   const gridSede = sedeSel.length>0 ? sedeSel[0] : SEDE_NAMES[0];
   const auleBtns=[]; SEDE_NAMES.forEach(function(s){ if(sedeOn(s)){ colsForSede(s).forEach(function(c){ if(!c.ph) auleBtns.push({sede:s,name:c.name}); }); } });
   function hitQT(o){ if(!tipoOn(o.tipo)) return false; if(q&&(o.att||"").toLowerCase().indexOf(q.toLowerCase())<0) return false; return true; }
+  function liberiCalc(cfg){
+    const out=[];
+    SEDE_NAMES.forEach(function(s){ if(!sedeOn(s)) return;
+      colsForSede(s).forEach(function(c){ if(c.ph) return; if(!aulaOn(s,c.name)) return;
+        const busy=[]; for(let i=0;i<SLOTS;i++) busy.push(false);
+        occ.forEach(function(o){ if(o.sede!==s||o.room!==c.name||o.day!==cfg.day) return; for(let i=o.start;i<o.end&&i<SLOTS;i++) busy[i]=true; });
+        let from=0, to=SLOTS;
+        if(cfg.mode==="ora"){ from=cfg.ora; to=SLOTS; }
+        const gaps=[]; let i=from;
+        while(i<to){ if(!busy[i]){ let j=i; while(j<to&&!busy[j]) j++; if((j-i)>=cfg.dur) gaps.push({start:i,end:j}); i=j; } else i++; }
+        if(cfg.mode==="ora"){ const g=gaps.filter(function(x){ return x.start<=cfg.ora; }); if(g.length===0) return; out.push({sede:s,room:c.name,gaps:g}); }
+        else { if(gaps.length===0) return; out.push({sede:s,room:c.name,gaps:gaps}); }
+      });
+    });
+    return out;
+  }
   function exportExcelTop(){ const rows=occ.filter(o=> sedeOn(o.sede) && aulaOn(o.sede,o.room) && tipoOn(o.tipo) && (!q||(o.att||"").toLowerCase().indexOf(q.toLowerCase())>=0)); rows.sort((a,b)=> a.sede.localeCompare(b.sede)||a.day-b.day||a.start-b.start||a.room.localeCompare(b.room)); exportExcel(rows); }
   function segForSedeDay(s,d){ const arr=seg[s]||[]; return arr.filter(x=>x.day===d); }
 
@@ -606,7 +623,7 @@ function App(){
       <button className="seg" aria-pressed={page==="cal"} onClick={()=>setPage("cal")}>Calendario</button>
       {page==="cal" && <>
         <span className="vsep"></span>
-        <button className="seg" aria-pressed={view==="griglia"} onClick={()=>setView("griglia")}>Griglia</button>
+        <button className="seg" aria-pressed={view==="griglia"} onClick={()=>setView("griglia")}>Griglia con un solo giorno da scegliere</button>
         <button className="seg" aria-pressed={view==="settaule"} onClick={()=>setView("settaule")}>Settimana della CDQ (colpo d'occhio)</button>
         <button className="seg" aria-pressed={view==="elenco"} onClick={()=>setView("elenco")}>Elenco filtrabile</button>
         <span className="vsep"></span>
@@ -644,6 +661,7 @@ function App(){
           <select value={insF} onChange={ev=>setInsF(ev.target.value)}><option value="tutti">Tutti</option><option value="def">Definito</option><option value="nodef">Da definire</option></select></div>}
         <div className="fc"><label>Cerca</label><input className="search" type="text" value={q} placeholder="es. spagnolo" onChange={ev=>setQ(ev.target.value)} /></div>
         <span className="grow"></span>
+        <button className="btn" onClick={()=>setLibera({day:day,mode:"tutto",ora:4,dur:4})}>Spazi liberi</button>
         {canEdit && !noAS && <button className="btn primary" onClick={()=>{ const s=gridSede; const r=SEDI[s][0]; openNew(s,r,day,4); }}>+ Occupazione</button>}
       </>}
     </div>
@@ -660,6 +678,33 @@ function App(){
 
     <footer className="app">Documento di Christian &mdash; Spazio Ireos soc. coop. sociale ETS &middot; settimana tipo &middot; 15&nbsp;min 8:00&ndash;24:00</footer>
     {toast && <div className="toast">{toast}</div>}
+
+    {/* modale spazi liberi */}
+    <div className={"ovl"+(libera?" open":"")} onClick={ev=>{ if(ev.target.classList.contains("ovl")) setLibera(null); }}>
+      {libera && (function(){ const res=liberiCalc(libera); return <div className="modal">
+        <h2>Spazi liberi</h2>
+        <div className="field"><label>Giorno</label><select value={libera.day} style={{background:DAY_COLORS[libera.day],color:onColor(DAY_COLORS[libera.day]),fontWeight:700}} onChange={ev=>setLibera(Object.assign({},libera,{day:parseInt(ev.target.value,10)}))}>{DAYS.map((d,i)=> <option key={i} value={i} style={{background:DAY_COLORS[i],color:onColor(DAY_COLORS[i])}}>{d}</option>)}</select></div>
+        <div className="row2">
+          <div className="field"><label>Cosa cerco</label><select value={libera.mode} onChange={ev=>setLibera(Object.assign({},libera,{mode:ev.target.value}))}>
+            <option value="tutto">Tutti gli spazi liberi della giornata</option>
+            <option value="ora">Chi &egrave; libero a una certa ora</option>
+          </select></div>
+          {libera.mode==="ora" && <div className="field"><label>Ora</label><select value={libera.ora} onChange={ev=>setLibera(Object.assign({},libera,{ora:parseInt(ev.target.value,10)}))}>{Array.from({length:SLOTS}).map((x,i)=> <option key={i} value={i}>{slotToTime(i)}</option>)}</select></div>}
+        </div>
+        <div className="field"><label>Durata minima</label><select value={libera.dur} onChange={ev=>setLibera(Object.assign({},libera,{dur:parseInt(ev.target.value,10)}))}>
+          <option value={1}>15 minuti</option><option value={2}>30 minuti</option><option value={4}>1 ora</option><option value={6}>1 ora e 30</option><option value={8}>2 ore</option><option value={12}>3 ore</option>
+        </select></div>
+        <div style={{maxHeight:"46vh",overflow:"auto",border:"1px solid var(--hair)",borderRadius:8,padding:"6px 8px",background:"#FBF9F4"}}>
+          {res.length===0 ? <div className="muted" style={{padding:"8px 2px"}}>Nessuna aula libera con questi criteri (controlla anche i pulsantoni <b>Sede</b> e <b>Aula</b>).</div>
+           : res.map(function(r){ return <div key={r.sede+"|"+r.room} style={{padding:"5px 0",borderBottom:"1px solid var(--hair)"}}>
+              <div style={{fontWeight:800,fontSize:13}}><span className="sededot" style={{background:sedeColor(r.sede),display:"inline-block",width:9,height:9,borderRadius:3,marginRight:6}}></span>{r.room} <span className="muted" style={{fontWeight:600}}>&middot; {r.sede}</span></div>
+              <div style={{fontSize:12.5}}>{r.gaps.map(function(g,gi){ return <span key={gi} style={{marginRight:10}}>{slotToTime(g.start)+"\u2013"+slotToTime(g.end)}</span>; })}</div>
+            </div>; })}
+        </div>
+        <div className="muted" style={{fontSize:11.5,marginTop:6}}>Considera le CDQ e le aule accese nei pulsantoni. Le occupazioni sono quelle della settimana tipo del periodo in corso.</div>
+        <div className="modal-actions"><button className="btn" onClick={()=>setLibera(null)}>Chiudi</button></div>
+      </div>; })()}
+    </div>
 
     {/* modale occupazione */}
     <div className={"ovl"+(editing?" open":"")} onClick={ev=>{ if(ev.target.classList.contains("ovl")) setEditing(null); }}>
