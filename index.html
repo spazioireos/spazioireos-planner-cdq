@@ -535,15 +535,24 @@ function App(){
   function aulaOn(s,r){ return sedeOn(s) && aulaOff.indexOf(s+"|"+r)<0; }
   const gridSede = sedeSel.length>0 ? sedeSel[0] : SEDE_NAMES[0];
   const auleBtns=[]; SEDE_NAMES.forEach(function(s){ if(sedeOn(s)){ colsForSede(s).forEach(function(c){ if(!c.ph) auleBtns.push({sede:s,name:c.name}); }); } });
-  function hitQT(o){ if(!tipoOn(o.tipo)) return false; if(q&&(o.att||"").toLowerCase().indexOf(q.toLowerCase())<0) return false; return true; }
+  function hitQT(o){ if(!tipoOn(o.tipo)) return false;
+    if(q){ const s=q.toLowerCase();
+      const campi=[o.att||"",o.att2||"",o.ins||"",o.risA||"",o.room||"",o.sede||"",typeOf(o.tipo).label,perLabel(o.per,o.day)||"Ogni settimana",
+        (o.pay==="free"?"gratuito":(o.pay==="paid"?"a pagamento":"")),(o.ris?"riservato":""),
+        (hasIns(o.tipo)?(o.insDef?"insegnante definito":"insegnante da definire"):""),
+        (o.cert==="ok"?"certificato tutto ok":(o.cert==="chk"?"da verificare":"da certificare"))];
+      if(campi.join(" \u00B7 ").toLowerCase().indexOf(s)<0) return false; }
+    return true; }
   function liberiCalc(cfg){
     const out=[];
     SEDE_NAMES.forEach(function(s){ if(!sedeOn(s)) return;
       colsForSede(s).forEach(function(c){ if(c.ph) return; if(!aulaOn(s,c.name)) return;
+        if(cfg.piano&&cfg.piano!=="tutti"&&floorTok(c.name)!==cfg.piano) return;
         const busy=[]; for(let i=0;i<SLOTS;i++) busy.push(false);
         occ.forEach(function(o){ if(o.sede!==s||o.room!==c.name||o.day!==cfg.day) return; for(let i=o.start;i<o.end&&i<SLOTS;i++) busy[i]=true; });
         let from=0, to=SLOTS;
         if(cfg.mode==="ora"){ from=cfg.ora; to=SLOTS; }
+        if(cfg.mode==="fascia"){ from=cfg.da; to=cfg.a; }
         const gaps=[]; let i=from;
         while(i<to){ if(!busy[i]){ let j=i; while(j<to&&!busy[j]) j++; if((j-i)>=cfg.dur) gaps.push({start:i,end:j}); i=j; } else i++; }
         if(cfg.mode==="ora"){ const g=gaps.filter(function(x){ return x.start<=cfg.ora; }); if(g.length===0) return; out.push({sede:s,room:c.name,gaps:g}); }
@@ -552,7 +561,7 @@ function App(){
     });
     return out;
   }
-  function exportExcelTop(){ const rows=occ.filter(o=> sedeOn(o.sede) && aulaOn(o.sede,o.room) && tipoOn(o.tipo) && (!q||(o.att||"").toLowerCase().indexOf(q.toLowerCase())>=0)); rows.sort((a,b)=> a.sede.localeCompare(b.sede)||a.day-b.day||a.start-b.start||a.room.localeCompare(b.room)); exportExcel(rows); }
+  function exportExcelTop(){ const rows=occ.filter(o=> sedeOn(o.sede) && aulaOn(o.sede,o.room) && hitQT(o)); rows.sort((a,b)=> a.sede.localeCompare(b.sede)||a.day-b.day||a.start-b.start||a.room.localeCompare(b.room)); exportExcel(rows); }
   function segForSedeDay(s,d){ const arr=seg[s]||[]; return arr.filter(x=>x.day===d); }
 
   /* modale occ */
@@ -661,8 +670,10 @@ function App(){
           <select value={insF} onChange={ev=>setInsF(ev.target.value)}><option value="tutti">Tutti</option><option value="def">Definito</option><option value="nodef">Da definire</option></select></div>}
         <div className="fc"><label>Cerca</label><input className="search" type="text" value={q} placeholder="es. spagnolo" onChange={ev=>setQ(ev.target.value)} /></div>
         <span className="grow"></span>
-        <button className="btn" onClick={()=>setLibera({day:day,mode:"tutto",ora:4,dur:4})}>Spazi liberi</button>
-        {canEdit && !noAS && <button className="btn primary" onClick={()=>{ const s=gridSede; const r=SEDI[s][0]; openNew(s,r,day,4); }}>+ Occupazione</button>}
+        <div style={{display:"flex",flexDirection:"column",gap:6,alignItems:"stretch"}}>
+          <button className="btn" onClick={()=>setLibera({day:day,mode:"tutto",ora:4,da:0,a:SLOTS,dur:4,piano:"tutti"})}>Spazi liberi</button>
+          {canEdit && !noAS && <button className="btn primary" onClick={()=>{ const s=gridSede; const r=SEDI[s][0]; openNew(s,r,day,4); }}>+ Occupazione</button>}
+        </div>
       </>}
     </div>
 
@@ -688,12 +699,22 @@ function App(){
           <div className="field"><label>Cosa cerco</label><select value={libera.mode} onChange={ev=>setLibera(Object.assign({},libera,{mode:ev.target.value}))}>
             <option value="tutto">Tutti gli spazi liberi della giornata</option>
             <option value="ora">Chi &egrave; libero a una certa ora</option>
+            <option value="fascia">Chi &egrave; libero in una fascia dalle&ndash;alle</option>
           </select></div>
           {libera.mode==="ora" && <div className="field"><label>Ora</label><select value={libera.ora} onChange={ev=>setLibera(Object.assign({},libera,{ora:parseInt(ev.target.value,10)}))}>{Array.from({length:SLOTS}).map((x,i)=> <option key={i} value={i}>{slotToTime(i)}</option>)}</select></div>}
         </div>
+        {libera.mode==="fascia" && <div className="row2">
+          <div className="field"><label>Dalle</label><select value={libera.da} onChange={ev=>setLibera(Object.assign({},libera,{da:parseInt(ev.target.value,10)}))}>{Array.from({length:SLOTS}).map((x,i)=> <option key={i} value={i}>{slotToTime(i)}</option>)}</select></div>
+          <div className="field"><label>Alle</label><select value={libera.a} onChange={ev=>setLibera(Object.assign({},libera,{a:parseInt(ev.target.value,10)}))}>{Array.from({length:SLOTS+1}).map((x,i)=> <option key={i} value={i}>{slotToTime(i)}</option>)}</select></div>
+        </div>}
+        <div className="row2">
+        <div className="field"><label>Piano</label><select value={libera.piano} onChange={ev=>setLibera(Object.assign({},libera,{piano:ev.target.value}))}>
+          <option value="tutti">Tutti i piani</option><option value="PT">Piano terra (PT)</option><option value="1P">1&deg; piano</option><option value="2P">2&deg; piano</option><option value="3P">3&deg; piano</option>
+        </select></div>
         <div className="field"><label>Durata minima</label><select value={libera.dur} onChange={ev=>setLibera(Object.assign({},libera,{dur:parseInt(ev.target.value,10)}))}>
           <option value={1}>15 minuti</option><option value={2}>30 minuti</option><option value={4}>1 ora</option><option value={6}>1 ora e 30</option><option value={8}>2 ore</option><option value={12}>3 ore</option>
         </select></div>
+        </div>
         <div style={{maxHeight:"46vh",overflow:"auto",border:"1px solid var(--hair)",borderRadius:8,padding:"6px 8px",background:"#FBF9F4"}}>
           {res.length===0 ? <div className="muted" style={{padding:"8px 2px"}}>Nessuna aula libera con questi criteri (controlla anche i pulsantoni <b>Sede</b> e <b>Aula</b>).</div>
            : res.map(function(r){ return <div key={r.sede+"|"+r.room} style={{padding:"5px 0",borderBottom:"1px solid var(--hair)"}}>
@@ -730,15 +751,24 @@ function App(){
           <option value="mU">Ultimo del mese</option>
           <option value="una">Una tantum</option>
         </select></div>
-        {hasIns(editing.tipo) && <div className="field"><label>Insegnante</label><input type="text" value={editing.ins||""} maxLength={60} placeholder="nome insegnante/operatore" onChange={ev=>setEditing(Object.assign({},editing,{ins:ev.target.value}))} /></div>}
-        {hasIns(editing.tipo) && <div className="field"><label className="chkline"><input type="checkbox" checked={!!editing.insDef} onChange={ev=>setEditing(Object.assign({},editing,{insDef:ev.target.checked}))} /> <span>Insegnante definito (se spento: da definire)</span></label></div>}
+        {hasIns(editing.tipo) && <div className="field"><label>Insegnante</label>
+          <div className="chips" style={{gap:6,marginBottom:editing.insDef?6:0}}>
+            <button type="button" className={"cdqbtn"+(editing.insDef?"":" off")} style={editing.insDef?{background:"#27AE60",color:"#fff",borderColor:"#27AE60"}:undefined} onClick={()=>setEditing(Object.assign({},editing,{insDef:!editing.insDef,ins:editing.insDef?"":(editing.ins||"")}))}><span className="mk">{editing.insDef?"\u2713":"\u25CB"}</span>Insegnante definito</button>
+          </div>
+          {editing.insDef ? <input type="text" value={editing.ins||""} maxLength={60} placeholder="nome insegnante/operatore" onChange={ev=>setEditing(Object.assign({},editing,{ins:ev.target.value}))} />
+            : <div className="muted" style={{fontSize:12}}>Insegnante <b>da definire</b>: accendi il pulsante per scriverne il nome.</div>}
+        </div>}
         {isStructured(editing.tipo) && <div className="field"><label>Costo</label><select value={editing.pay||""} onChange={ev=>setEditing(Object.assign({},editing,{pay:ev.target.value}))}>
           <option value="">&mdash; (non specificato)</option>
           <option value="free">Gratuito</option>
           <option value="paid">A pagamento</option>
         </select></div>}
-        <div className="field"><label className="chkline"><input type="checkbox" checked={!!editing.ris} onChange={ev=>setEditing(Object.assign({},editing,{ris:ev.target.checked}))} /> <span>Riservato</span></label></div>
-        {editing.ris && <div className="field"><label>A chi &egrave; riservato</label><input type="text" value={editing.risA||""} maxLength={80} placeholder="es. minori 6-10 anni / soci / donne" onChange={ev=>setEditing(Object.assign({},editing,{risA:ev.target.value}))} /></div>}
+        <div className="field"><label>Riservato</label>
+          <div className="chips" style={{gap:6,marginBottom:editing.ris?6:0}}>
+            <button type="button" className={"cdqbtn"+(editing.ris?"":" off")} style={editing.ris?{background:"#7B1B02",color:"#fff",borderColor:"#7B1B02"}:undefined} onClick={()=>setEditing(Object.assign({},editing,{ris:!editing.ris,risA:editing.ris?"":(editing.risA||"")}))}><span className="mk">{editing.ris?"\u2713":"\u25CB"}</span>Riservato</button>
+          </div>
+          {editing.ris && <input type="text" value={editing.risA||""} maxLength={80} placeholder="A chi &egrave; riservato: es. minori 6-10 anni / soci / donne" onChange={ev=>setEditing(Object.assign({},editing,{risA:ev.target.value}))} />}
+        </div>
         <div className="row2">
           <div className="field"><label>Sede</label><select value={editing.sede} style={{background:sedeColor(editing.sede),color:onColor(sedeColor(editing.sede)),fontWeight:700}} onChange={ev=>{ const s=ev.target.value; setEditing(Object.assign({},editing,{sede:s,room:colsForSede(s)[0].name})); }}>{SEDE_NAMES.map(s=> <option key={s} value={s} style={{background:sedeColor(s),color:onColor(sedeColor(s))}}>{s}</option>)}</select></div>
           <div className="field"><label>Aula</label><select value={editing.room} onChange={ev=>setEditing(Object.assign({},editing,{room:ev.target.value}))}>{colsForSede(editing.sede).map(c=> <option key={c.name} value={c.name}>{c.name}{c.floor?(" \u00B7 "+c.floor):""}</option>)}</select></div>
@@ -910,7 +940,7 @@ function GridCore({cols,scope,canEdit,onEmpty,onBlock,onCert,railBands,colBands,
     for(let c=0;c<cols.length;c++){ const cell=occMat[c][r]; const bands=cb(c);
       if(cell&&cell.kind==="cov") continue;
       if(cell&&cell.kind==="start"){ const b=cell.b,t=typeOf(b.tipo),ink=t.ink;
-        const style={borderLeftColor:t.color,background:hexToRgba(t.color,t.key==="corso"?0.28:0.16)};
+        const style={borderLeftColor:t.color,background:hexToRgba(t.color,0.16)};
         tds.push(<td key={c} rowSpan={cell.span} className={"block"+(canEdit?" clk":"")} style={style} onClick={canEdit?(()=>onBlock(b)):undefined}>{onCert?<CertDot o={b} canEdit={canEdit} onCert={onCert} />:null}
           <div className="act" style={ink?{color:ink}:undefined}>{b.att||"(senza titolo)"}</div>{b.att2?<div className="sub" style={ink?{color:ink}:undefined}>{b.att2}</div>:null}<div className="meta">{slotToTime(b.start)+"\u2013"+slotToTime(b.end)}</div><div className="tp" style={{color:ink||t.color}}>{t.label}</div>{perLabel(b.per,b.day)?<div className="per">{perLabel(b.per,b.day)}</div>:null}{b.ins?<div className="ins">docente: {b.ins}</div>:null}{(b.pay||b.ris||(hasIns(b.tipo)&&!b.insDef))?<div className="flags">{b.pay==="free"?<span className="flag free">gratuito</span>:null}{b.pay==="paid"?<span className="flag paid">a pagamento</span>:null}{b.ris?<span className="flag ris">riservato{b.risA?": "+b.risA:""}</span>:null}{(hasIns(b.tipo)&&!b.insDef)?<span className="flag def">docente da definire</span>:null}</div>:null}</td>);
       } else { const ph=cols[c].ph; const f=frame(bands,r);
