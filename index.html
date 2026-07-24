@@ -544,19 +544,35 @@ function App(){
       if(campi.join(" \u00B7 ").toLowerCase().indexOf(s)<0) return false; }
     return true; }
   function liberiCalc(cfg){
+    const days=(cfg.days&&cfg.days.length>0)?cfg.days.slice().sort(function(a,b){return a-b;}):[];
     const out=[];
+    if(days.length===0) return out;
+    function gapsFor(busy){
+      let from=0, to=SLOTS;
+      if(cfg.mode==="ora"){ from=cfg.ora; to=SLOTS; }
+      if(cfg.mode==="fascia"){ from=cfg.da; to=cfg.a; }
+      const gaps=[]; let i=from;
+      while(i<to){ if(!busy[i]){ let j=i; while(j<to&&!busy[j]) j++; if((j-i)>=cfg.dur) gaps.push({start:i,end:j}); i=j; } else i++; }
+      return (cfg.mode==="ora") ? gaps.filter(function(x){ return x.start<=cfg.ora; }) : gaps;
+    }
     SEDE_NAMES.forEach(function(s){ if(!sedeOn(s)) return;
       colsForSede(s).forEach(function(c){ if(c.ph) return; if(!aulaOn(s,c.name)) return;
         if(cfg.piano&&cfg.piano!=="tutti"&&floorTok(c.name)!==cfg.piano) return;
-        const busy=[]; for(let i=0;i<SLOTS;i++) busy.push(false);
-        occ.forEach(function(o){ if(o.sede!==s||o.room!==c.name||o.day!==cfg.day) return; for(let i=o.start;i<o.end&&i<SLOTS;i++) busy[i]=true; });
-        let from=0, to=SLOTS;
-        if(cfg.mode==="ora"){ from=cfg.ora; to=SLOTS; }
-        if(cfg.mode==="fascia"){ from=cfg.da; to=cfg.a; }
-        const gaps=[]; let i=from;
-        while(i<to){ if(!busy[i]){ let j=i; while(j<to&&!busy[j]) j++; if((j-i)>=cfg.dur) gaps.push({start:i,end:j}); i=j; } else i++; }
-        if(cfg.mode==="ora"){ const g=gaps.filter(function(x){ return x.start<=cfg.ora; }); if(g.length===0) return; out.push({sede:s,room:c.name,gaps:g}); }
-        else { if(gaps.length===0) return; out.push({sede:s,room:c.name,gaps:gaps}); }
+        if(cfg.tutti&&days.length>1){
+          const busy=[]; for(let i=0;i<SLOTS;i++) busy.push(false);
+          occ.forEach(function(o){ if(o.sede!==s||o.room!==c.name) return; if(days.indexOf(o.day)<0) return; for(let i=o.start;i<o.end&&i<SLOTS;i++) busy[i]=true; });
+          const g=gapsFor(busy); if(g.length===0) return;
+          out.push({sede:s,room:c.name,comuni:g,perGiorno:null});
+        } else {
+          const perGiorno=[];
+          days.forEach(function(d){
+            const busy=[]; for(let i=0;i<SLOTS;i++) busy.push(false);
+            occ.forEach(function(o){ if(o.sede!==s||o.room!==c.name||o.day!==d) return; for(let i=o.start;i<o.end&&i<SLOTS;i++) busy[i]=true; });
+            const g=gapsFor(busy); if(g.length>0) perGiorno.push({day:d,gaps:g});
+          });
+          if(perGiorno.length===0) return;
+          out.push({sede:s,room:c.name,comuni:null,perGiorno:perGiorno});
+        }
       });
     });
     return out;
@@ -671,7 +687,7 @@ function App(){
         <div className="fc"><label>Cerca</label><input className="search" type="text" value={q} placeholder="es. spagnolo" onChange={ev=>setQ(ev.target.value)} /></div>
         <span className="grow"></span>
         <div style={{display:"flex",flexDirection:"column",gap:6,alignItems:"stretch"}}>
-          <button className="btn" onClick={()=>setLibera({day:day,mode:"tutto",ora:4,da:0,a:SLOTS,dur:4,piano:"tutti"})}>Spazi liberi</button>
+          <button className="btn" onClick={()=>setLibera({days:[day],mode:"tutto",ora:4,da:0,a:SLOTS,dur:4,piano:"tutti",tutti:false})}>Spazi liberi</button>
           {canEdit && !noAS && <button className="btn primary" onClick={()=>{ const s=gridSede; const r=SEDI[s][0]; openNew(s,r,day,4); }}>+ Occupazione</button>}
         </div>
       </>}
@@ -694,7 +710,20 @@ function App(){
     <div className={"ovl"+(libera?" open":"")} onClick={ev=>{ if(ev.target.classList.contains("ovl")) setLibera(null); }}>
       {libera && (function(){ const res=liberiCalc(libera); return <div className="modal">
         <h2>Spazi liberi</h2>
-        <div className="field"><label>Giorno</label><select value={libera.day} style={{background:DAY_COLORS[libera.day],color:onColor(DAY_COLORS[libera.day]),fontWeight:700}} onChange={ev=>setLibera(Object.assign({},libera,{day:parseInt(ev.target.value,10)}))}>{DAYS.map((d,i)=> <option key={i} value={i} style={{background:DAY_COLORS[i],color:onColor(DAY_COLORS[i])}}>{d}</option>)}</select></div>
+        <div className="field"><label>Giorni</label>
+          <div className="chips" style={{gap:6,marginBottom:6}}>
+            <button className="anbtn" onClick={()=>setLibera(Object.assign({},libera,{days:[0,1,2,3,4,5,6]}))}>Tutti</button>
+            <button className="anbtn" onClick={()=>setLibera(Object.assign({},libera,{days:[0,1,2,3,4]}))}>Lun&ndash;Ven</button>
+            <button className="anbtn" onClick={()=>setLibera(Object.assign({},libera,{days:[]}))}>Nessuno</button>
+          </div>
+          <div className="chips" style={{gap:6}}>{DAYS.map(function(d,i){ const on=libera.days.indexOf(i)>=0; const c=DAY_COLORS[i];
+            return <button key={i} className={"cdqbtn"+(on?"":" off")} style={on?{background:c,color:onColor(c),borderColor:c}:undefined} onClick={()=>setLibera(Object.assign({},libera,{days:on?libera.days.filter(function(x){return x!==i;}):libera.days.concat([i])}))}><span className="mk">{on?"\u2713":"\u25CB"}</span>{!on && <span className="dot" style={{background:c}}></span>}{d}</button>; })}</div>
+        </div>
+        {libera.days.length>1 && <div className="field"><label>Come cercare su pi&ugrave; giorni</label>
+          <select value={libera.tutti?"tutti":"uno"} onChange={ev=>setLibera(Object.assign({},libera,{tutti:ev.target.value==="tutti"}))}>
+            <option value="uno">Libero in almeno uno dei giorni scelti (panoramica)</option>
+            <option value="tutti">Libero in tutti i giorni scelti, alla stessa ora (per corsi ricorrenti)</option>
+          </select></div>}
         <div className="row2">
           <div className="field"><label>Cosa cerco</label><select value={libera.mode} onChange={ev=>setLibera(Object.assign({},libera,{mode:ev.target.value}))}>
             <option value="tutto">Tutti gli spazi liberi della giornata</option>
@@ -716,10 +745,14 @@ function App(){
         </select></div>
         </div>
         <div style={{maxHeight:"46vh",overflow:"auto",border:"1px solid var(--hair)",borderRadius:8,padding:"6px 8px",background:"#FBF9F4"}}>
-          {res.length===0 ? <div className="muted" style={{padding:"8px 2px"}}>Nessuna aula libera con questi criteri (controlla anche i pulsantoni <b>Sede</b> e <b>Aula</b>).</div>
-           : res.map(function(r){ return <div key={r.sede+"|"+r.room} style={{padding:"5px 0",borderBottom:"1px solid var(--hair)"}}>
-              <div style={{fontWeight:800,fontSize:13}}><span className="sededot" style={{background:sedeColor(r.sede),display:"inline-block",width:9,height:9,borderRadius:3,marginRight:6}}></span>{r.room} <span className="muted" style={{fontWeight:600}}>&middot; {r.sede}</span></div>
-              <div style={{fontSize:12.5}}>{r.gaps.map(function(g,gi){ return <span key={gi} style={{marginRight:10}}>{slotToTime(g.start)+"\u2013"+slotToTime(g.end)}</span>; })}</div>
+          {res.length===0 ? <div className="muted" style={{padding:"8px 2px"}}>{libera.days.length===0?"Scegli almeno un giorno.":"Nessuna aula libera con questi criteri (controlla anche i pulsantoni Sede e Aula)."}</div>
+           : res.map(function(r){ return <div key={r.sede+"|"+r.room} style={{padding:"6px 0",borderBottom:"1px solid var(--hair)"}}>
+              <div style={{fontWeight:800,fontSize:13}}><span style={{background:sedeColor(r.sede),display:"inline-block",width:9,height:9,borderRadius:3,marginRight:6}}></span>{r.room} <span className="muted" style={{fontWeight:600}}>&middot; {r.sede}</span></div>
+              {r.comuni ? <div style={{fontSize:12.5,marginTop:2}}><span className="lflag def">in tutti i giorni scelti</span> {r.comuni.map(function(g,gi){ return <span key={gi} style={{marginRight:10}}>{slotToTime(g.start)+"\u2013"+slotToTime(g.end)}</span>; })}</div>
+               : r.perGiorno.map(function(pg){ return <div key={pg.day} style={{fontSize:12.5,marginTop:2,display:"flex",gap:6,alignItems:"baseline"}}>
+                   <span style={{background:DAY_COLORS[pg.day],color:onColor(DAY_COLORS[pg.day]),fontWeight:800,fontSize:10.5,padding:"1px 6px",borderRadius:4,whiteSpace:"nowrap"}}>{DAYS_SH[pg.day]}</span>
+                   <span>{pg.gaps.map(function(g,gi){ return <span key={gi} style={{marginRight:10}}>{slotToTime(g.start)+"\u2013"+slotToTime(g.end)}</span>; })}</span>
+                 </div>; })}
             </div>; })}
         </div>
         <div className="muted" style={{fontSize:11.5,marginTop:6}}>Considera le CDQ e le aule accese nei pulsantoni. Le occupazioni sono quelle della settimana tipo del periodo in corso.</div>
