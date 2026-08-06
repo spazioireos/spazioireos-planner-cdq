@@ -178,6 +178,21 @@
   footer.app{margin-top:14px;font-size:11px;color:var(--muted);text-align:center}
   .banner{background:#FFF8E6;border:1px solid #F2E2B0;color:#7A5B00;border-radius:10px;padding:7px 12px;font-size:12.5px;margin-bottom:8px}
   @media (max-width:640px){ .topbar h1{font-size:14px} td.cell{min-width:100px} }
+  .printhead{display:none}
+  @media print{
+    @page{ size:A4 portrait; margin:10mm; }
+    html,body{ background:#fff !important; }
+    .topbar,.strip,.legend,.toast,.ovl,footer,.tbtn,.seg-wrap,.days,.banner{ display:none !important; }
+    .printarea{ margin:0 !important; padding:0 !important; }
+    .printhead{ display:block !important; font-weight:800; font-size:12px; margin:0 0 6px; padding-bottom:4px; border-bottom:2px solid #333; }
+    .grid-card{ box-shadow:none !important; border:none !important; padding:0 !important; margin:0 !important; }
+    .grid-scroll{ overflow:visible !important; max-height:none !important; }
+    table{ font-size:8px !important; }
+    thead th,td.time-col{ position:static !important; }
+    td.block .act{ font-size:8px !important; }
+    *{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
+    button{ display:none !important; }
+  }
 </style>
 </head>
 <body>
@@ -408,6 +423,14 @@ function App(){
     return ()=>{ u1();u2();u3(); };
   },[user,role]);
 
+  useEffect(()=>{
+    function fit(){ const n=document.querySelector(".printarea"); if(!n) return; n.style.transform=""; n.style.width="";
+      const sc=n.querySelector(".grid-scroll"); if(sc){ sc.style.overflow="visible"; sc.dataset.pw="1"; }
+      const pageW=690; const w=n.scrollWidth; if(w>pageW){ const s=pageW/w; n.style.transformOrigin="top left"; n.style.transform="scale("+s+")"; n.style.width=(100/s)+"%"; } }
+    function unfit(){ const n=document.querySelector(".printarea"); if(!n) return; n.style.transform=""; n.style.width=""; const sc=n.querySelector(".grid-scroll"); if(sc&&sc.dataset.pw){ sc.style.overflow=""; delete sc.dataset.pw; } }
+    window.addEventListener("beforeprint",fit); window.addEventListener("afterprint",unfit);
+    return ()=>{ window.removeEventListener("beforeprint",fit); window.removeEventListener("afterprint",unfit); };
+  },[]);
   useEffect(()=>{ function h(e){ if(dirtyRef.current){ e.preventDefault(); e.returnValue=""; return ""; } } window.addEventListener("beforeunload",h); return ()=>window.removeEventListener("beforeunload",h); },[]);
 
   function pickDefault(A){
@@ -557,7 +580,7 @@ function App(){
     }
     SEDE_NAMES.forEach(function(s){ if(!sedeOn(s)) return;
       colsForSede(s).forEach(function(c){ if(c.ph) return; if(!aulaOn(s,c.name)) return;
-        if(cfg.piano&&cfg.piano!=="tutti"&&floorTok(c.name)!==cfg.piano) return;
+        if(cfg.aula && (s+"|"+c.name)!==cfg.aula) return;
         if(cfg.tutti&&days.length>1){
           const busy=[]; for(let i=0;i<SLOTS;i++) busy.push(false);
           occ.forEach(function(o){ if(o.sede!==s||o.room!==c.name) return; if(days.indexOf(o.day)<0) return; for(let i=o.start;i<o.end&&i<SLOTS;i++) busy[i]=true; });
@@ -632,6 +655,7 @@ function App(){
       {canEdit && !noAS && <button className={"tbtn save"+(dirty?" pulse":"")} onClick={saveAll}>Salva</button>}
       <button className="tbtn" onClick={exportAll}>Esporta</button>
       <button className="tbtn" onClick={exportExcelTop}>Esporta Excel</button>
+      <button className="tbtn" onClick={()=>{ if(page!=="cal") setPage("cal"); setTimeout(function(){ window.print(); }, 60); }}>Stampa / PDF</button>
       <button className="tbtn" onClick={()=>fileRef.current&&fileRef.current.click()}>Importa</button>
       <input ref={fileRef} type="file" accept="application/json,.json" style={{display:"none"}} onChange={ev=>{ if(ev.target.files[0]){ importAll(ev.target.files[0]); ev.target.value=""; } }} />
       <span className="who">{user?user.email:""}<span className="pillrole">{MODE==="demo"?"DEMO":(role||"")}</span>
@@ -687,7 +711,7 @@ function App(){
         <div className="fc"><label>Cerca</label><input className="search" type="text" value={q} placeholder="es. spagnolo" onChange={ev=>setQ(ev.target.value)} /></div>
         <span className="grow"></span>
         <div style={{display:"flex",flexDirection:"column",gap:6,alignItems:"stretch"}}>
-          <button className="btn" onClick={()=>setLibera({days:[day],mode:"tutto",ora:4,da:0,a:SLOTS,dur:4,piano:"tutti",tutti:false})}>Spazi liberi</button>
+          <button className="btn" onClick={()=>setLibera({days:[day],mode:"tutto",ora:4,da:0,a:SLOTS,dur:4,aula:"",tutti:false})}>Spazi liberi</button>
           {canEdit && !noAS && <button className="btn primary" onClick={()=>{ const s=gridSede; const r=SEDI[s][0]; openNew(s,r,day,4); }}>+ Occupazione</button>}
         </div>
       </>}
@@ -695,13 +719,14 @@ function App(){
 
     {page==="home" && <HomeView seg={seg} periodi={periodi} curPer={curPer} isAdmin={isAdmin} onEditSede={s=>setSegEdit(s)} goCal={s=>{ if(s)setSedeSel([s]); setPage("cal"); setView("griglia"); }} />}
 
-    {page==="cal" && !noAS && <>
+    {page==="cal" && !noAS && <div className="printarea">
+      <div className="printhead">Calendario CDQ &middot; Spazio Ireos &mdash; {view==="griglia"?("Griglia \u2013 "+DAYS[day]):(view==="settaule"?("Settimana \u2013 "+(sedeSel.length>0?sedeSel[0]:"")):"Elenco")} &middot; A.S. {curAS} &middot; {(periodi.find(x=>x.id===curPer)||{}).nome||""} &middot; settimana tipo</div>
       {view==="griglia" && <Griglia day={day} occ={occ} hitQT={hitQT} sedeSel={sedeSel} aulaOn={aulaOn} railBands={sedeSel.length===1?segForSedeDay(sedeSel[0],day):null} segColor={sedeSel.length===1?sedeColor(sedeSel[0]):"#B0A99A"} canEdit={canEdit} onCell={openNew} onBlock={openEdit} onCert={cycleCert} />}
       {view==="settaule" && <WeekGridAule sede={gridSede} aulaOn={aulaOn} occ={occ} hitQT={hitQT} canEdit={canEdit} onCell={openNew} onBlock={openEdit} onCert={cycleCert} />}
       {view==="elenco" && <ListView occ={occ} sedeSel={sedeSel} aulaOn={aulaOn} giornoSet={giornoSet} certF={certF} risF={risF} payF={payF} insF={insF} hitQT={hitQT} canEdit={canEdit} onBlock={openEdit} onCert={cycleCert} />}
       <div className="legend">{TYPES.map(t=> <span key={t.key} className="it" style={t.ink?{color:t.ink,fontWeight:700}:undefined}><span className="sw" style={{background:t.color}}></span>{t.label}</span>)}
         <span className="it"><span className="sw" style={{background:hexToRgba(sedeColor(gridSede),0.35)}}></span>tinta = orario di segreteria</span></div>
-    </>}
+    </div>}
 
     <footer className="app">Documento di Christian &mdash; Spazio Ireos soc. coop. sociale ETS &middot; settimana tipo &middot; 15&nbsp;min 8:00&ndash;24:00</footer>
     {toast && <div className="toast">{toast}</div>}
@@ -737,8 +762,8 @@ function App(){
           <div className="field"><label>Alle</label><select value={libera.a} onChange={ev=>setLibera(Object.assign({},libera,{a:parseInt(ev.target.value,10)}))}>{Array.from({length:SLOTS+1}).map((x,i)=> <option key={i} value={i}>{slotToTime(i)}</option>)}</select></div>
         </div>}
         <div className="row2">
-        <div className="field"><label>Piano</label><select value={libera.piano} onChange={ev=>setLibera(Object.assign({},libera,{piano:ev.target.value}))}>
-          <option value="tutti">Tutti i piani</option><option value="PT">Piano terra (PT)</option><option value="1P">1&deg; piano</option><option value="2P">2&deg; piano</option><option value="3P">3&deg; piano</option>
+        <div className="field"><label>Aula</label><select value={libera.aula} onChange={ev=>setLibera(Object.assign({},libera,{aula:ev.target.value}))}>
+          <option value="">Tutte le aule (accese)</option>{auleBtns.map(function(a){ const k=a.sede+"|"+a.name; return <option key={k} value={k}>{a.name+" \u00B7 "+a.sede}</option>; })}
         </select></div>
         <div className="field"><label>Durata minima</label><select value={libera.dur} onChange={ev=>setLibera(Object.assign({},libera,{dur:parseInt(ev.target.value,10)}))}>
           <option value={1}>15 minuti</option><option value={2}>30 minuti</option><option value={4}>1 ora</option><option value={6}>1 ora e 30</option><option value={8}>2 ore</option><option value={12}>3 ore</option>
