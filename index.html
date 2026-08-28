@@ -117,6 +117,10 @@
   .weekhdr{font-weight:800;font-size:14px;padding:4px 10px;margin:2px 0 4px;border-left:4px solid #888;background:#F5F2EB;border-radius:4px}
   td.block .ins{font-size:9.5px;color:var(--muted);line-height:1.1}
   .flag.def,.lflag.def{background:#FFF3CD;color:#8A6D00}
+  .lflag.segfull{background:#E7F6EC;color:#1E7D3C}
+  .lflag.segpart{background:#FFF3E0;color:#A15C00}
+  .lflag.segout{background:#EEEEEE;color:#666}
+  .lflag.segkey{background:#FDF6E3;color:#7A5B00}
   .certdot{display:inline-block;width:12px;height:12px;border-radius:50%;border:2px solid #B0AAA0;background:transparent;box-sizing:border-box;vertical-align:middle}
   .certdot.clk{cursor:pointer}
   td.block .certdot{position:absolute;top:3px;right:3px;z-index:2}
@@ -374,6 +378,7 @@ function App(){
   const [risF,setRisF]=useState("tutti");
   const [payF,setPayF]=useState("tutti");
   const [insF,setInsF]=useState("tutti");
+  const [segF,setSegF]=useState("tutti");
 
   const [editing,setEditing]=useState(null);
   const [libera,setLibera]=useState(null);
@@ -705,6 +710,8 @@ function App(){
           <select value={payF} onChange={ev=>setPayF(ev.target.value)}><option value="tutti">Tutti</option><option value="free">Gratuito</option><option value="paid">A pagamento</option><option value="none">Non specificato</option></select></div>}
         {view==="elenco" && <div className="fc"><label>Insegnante</label>
           <select value={insF} onChange={ev=>setInsF(ev.target.value)}><option value="tutti">Tutti</option><option value="def">Definito</option><option value="nodef">Da definire</option></select></div>}
+        {view==="elenco" && <div className="fc"><label>Segreteria</label>
+          <select value={segF} onChange={ev=>setSegF(ev.target.value)}><option value="tutti">Tutte</option><option value="full">Interamente in segreteria</option><option value="partial">In parte</option><option value="none">Fuori</option></select></div>}
         <div className="fc"><label>Cerca</label><input className="search" type="text" value={q} placeholder="es. spagnolo" onChange={ev=>setQ(ev.target.value)} /></div>
         <span className="grow"></span>
         <div style={{display:"flex",flexDirection:"column",gap:6,alignItems:"stretch"}}>
@@ -720,7 +727,7 @@ function App(){
       <div className="printhead">Calendario CDQ &middot; Spazio Ireos &mdash; {view==="griglia"?("Griglia \u2013 "+DAYS[day]):(view==="settaule"?("Settimana \u2013 "+(sedeSel.length>0?sedeSel[0]:"")):"Elenco")} &middot; A.S. {curAS} &middot; {(periodi.find(x=>x.id===curPer)||{}).nome||""} &middot; settimana tipo</div>
       {view==="griglia" && <Griglia day={day} occ={occ} hitQT={hitQT} sedeSel={sedeSel} aulaOn={aulaOn} railBands={sedeSel.length===1?segForSedeDay(sedeSel[0],day):null} segColor={sedeSel.length===1?sedeColor(sedeSel[0]):"#B0A99A"} canEdit={canEdit} onCell={openNew} onBlock={openEdit} onCert={cycleCert} />}
       {view==="settaule" && <WeekGridAule sede={gridSede} aulaOn={aulaOn} occ={occ} hitQT={hitQT} canEdit={canEdit} onCell={openNew} onBlock={openEdit} onCert={cycleCert} />}
-      {view==="elenco" && <ListView occ={occ} sedeSel={sedeSel} aulaOn={aulaOn} giornoSet={giornoSet} certF={certF} risF={risF} payF={payF} insF={insF} hitQT={hitQT} canEdit={canEdit} onBlock={openEdit} onCert={cycleCert} />}
+      {view==="elenco" && <ListView occ={occ} seg={seg} sedeSel={sedeSel} aulaOn={aulaOn} giornoSet={giornoSet} certF={certF} risF={risF} payF={payF} insF={insF} segF={segF} hitQT={hitQT} canEdit={canEdit} onBlock={openEdit} onCert={cycleCert} />}
       <div className="legend">{TYPES.map(t=> <span key={t.key} className="it" style={t.ink?{color:t.ink,fontWeight:700}:undefined}><span className="sw" style={{background:t.color}}></span>{t.label}</span>)}
         <span className="it"><span className="sw" style={{background:hexToRgba(sedeColor(gridSede),0.35)}}></span>tinta = orario di segreteria</span></div>
     </div>}
@@ -1065,8 +1072,12 @@ function exportExcel(rows){
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"Occupazioni");
   XLSX.writeFile(wb, "Calendario CDQ Spazio Ireos - Elenco "+nowStamp()+".xlsx");
 }
-function ListView({occ,sedeSel,aulaOn,giornoSet,certF,risF,payF,insF,hitQT,canEdit,onBlock,onCert}){
-  let rows=occ.filter(o=>{ if(sedeSel.indexOf(o.sede)<0) return false; if(!aulaOn(o.sede,o.room)) return false; if(giornoSet.indexOf(o.day)<0) return false; if(certF&&certF!=="tutti"){ const c=o.cert||""; if(certF==="none"?c!=="":c!==certF) return false; } if(risF==="si"&&!o.ris) return false; if(risF==="no"&&o.ris) return false; if(payF&&payF!=="tutti"){ const pp=o.pay||""; if(payF==="none"?pp!=="":pp!==payF) return false; } if(insF==="def"&&!(hasIns(o.tipo)&&o.insDef)) return false; if(insF==="nodef"&&!(hasIns(o.tipo)&&!o.insDef)) return false; return hitQT(o); });
+function ListView({occ,seg,sedeSel,aulaOn,giornoSet,certF,risF,payF,insF,segF,hitQT,canEdit,onBlock,onCert}){
+  function segBands(o){ const arr=(seg&&seg[o.sede])?seg[o.sede]:[]; return arr.filter(function(x){return x.day===o.day;}); }
+  function inB(slot,bands){ for(let j=0;j<bands.length;j++){ if(slot>=bands[j].start&&slot<bands[j].end) return true; } return false; }
+  function covType(o){ const bands=segBands(o); if(bands.length===0) return "none"; let cov=0; for(let i=o.start;i<o.end;i++){ if(inB(i,bands)) cov++; } if(cov===0) return "none"; if(cov>=(o.end-o.start)) return "full"; return "partial"; }
+  function keyNeed(o){ const bands=segBands(o); return {ap:!inB(o.start,bands), ch:!inB(o.end-1,bands)}; }
+  let rows=occ.filter(o=>{ if(sedeSel.indexOf(o.sede)<0) return false; if(!aulaOn(o.sede,o.room)) return false; if(giornoSet.indexOf(o.day)<0) return false; if(certF&&certF!=="tutti"){ const c=o.cert||""; if(certF==="none"?c!=="":c!==certF) return false; } if(risF==="si"&&!o.ris) return false; if(risF==="no"&&o.ris) return false; if(payF&&payF!=="tutti"){ const pp=o.pay||""; if(payF==="none"?pp!=="":pp!==payF) return false; } if(insF==="def"&&!(hasIns(o.tipo)&&o.insDef)) return false; if(insF==="nodef"&&!(hasIns(o.tipo)&&!o.insDef)) return false; if(segF&&segF!=="tutti"&&covType(o)!==segF) return false; return hitQT(o); });
   rows.sort((a,b)=> a.sede.localeCompare(b.sede)||a.day-b.day||a.start-b.start||a.room.localeCompare(b.room));
   if(rows.length===0) return <div className="grid-card"><div className="empty-state">Nessuna occupazione corrisponde ai filtri.</div></div>;
   const totMin={}; rows.forEach(o=>{ totMin[o.tipo]=(totMin[o.tipo]||0)+(o.end-o.start)*15; });
@@ -1074,12 +1085,12 @@ function ListView({occ,sedeSel,aulaOn,giornoSet,certF,risF,payF,insF,hitQT,canEd
   return (<div>
     <div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><button className="btn sm" onClick={()=>exportExcel(rows)}>Esporta Excel</button></div>
     <div className="grid-card"><div className="grid-scroll"><table className="list">
-    <thead><tr><th>Sede</th><th>Aula</th><th>Giorno</th><th>Orario</th><th>Attivit&agrave;</th><th>Tipo</th></tr></thead>
+    <thead><tr><th>Sede</th><th>Aula</th><th>Giorno</th><th>Orario</th><th>Attivit&agrave;</th><th>Tipo</th><th>Segreteria</th></tr></thead>
     <tbody>{rows.map(o=>{ const t=typeOf(o.tipo);
       return <tr key={o.id} onClick={canEdit?(()=>onBlock(o)):undefined}>
         <td><span className="sedepill"><span className="d" style={{background:sedeColor(o.sede)}}></span>{o.sede}</span></td>
         <td>{o.room}</td><td>{DAYS[o.day]}</td><td style={{whiteSpace:"nowrap"}}>{slotToTime(o.start)+"\u2013"+slotToTime(o.end)}</td>
-        <td style={t.ink?{color:t.ink,fontWeight:700}:undefined}><CertDot o={o} canEdit={canEdit} onCert={onCert} /> {o.att}{o.att2?<span style={t.ink?{color:t.ink}:{color:"var(--muted)"}}> &middot; {o.att2}</span>:null}{o.ins?<span className="muted"> &middot; docente: {o.ins}</span>:null}{perLabel(o.per,o.day)?<span className="muted" style={{fontStyle:"italic"}}> &middot; {perLabel(o.per,o.day)}</span>:null}{o.pay==="free"?<span className="lflag free">gratuito</span>:null}{o.pay==="paid"?<span className="lflag paid">a pagamento</span>:null}{o.ris?<span className="lflag ris">riservato{o.risA?": "+o.risA:""}</span>:null}{(hasIns(o.tipo)&&!o.insDef)?<span className="lflag def">docente da definire</span>:null}</td><td><span className="pill" style={{borderLeftColor:t.color,background:hexToRgba(t.color,0.16),color:t.ink||undefined,fontWeight:t.ink?800:700}}>{t.label}</span></td></tr>; })}</tbody>
+        <td style={t.ink?{color:t.ink,fontWeight:700}:undefined}><CertDot o={o} canEdit={canEdit} onCert={onCert} /> {o.att}{o.att2?<span style={t.ink?{color:t.ink}:{color:"var(--muted)"}}> &middot; {o.att2}</span>:null}{o.ins?<span className="muted"> &middot; docente: {o.ins}</span>:null}{perLabel(o.per,o.day)?<span className="muted" style={{fontStyle:"italic"}}> &middot; {perLabel(o.per,o.day)}</span>:null}{o.pay==="free"?<span className="lflag free">gratuito</span>:null}{o.pay==="paid"?<span className="lflag paid">a pagamento</span>:null}{o.ris?<span className="lflag ris">riservato{o.risA?": "+o.risA:""}</span>:null}{(hasIns(o.tipo)&&!o.insDef)?<span className="lflag def">docente da definire</span>:null}</td><td><span className="pill" style={{borderLeftColor:t.color,background:hexToRgba(t.color,0.16),color:t.ink||undefined,fontWeight:t.ink?800:700}}>{t.label}</span></td><td>{(function(){ const c=covType(o); const k=keyNeed(o); const badge=c==="full"?<span className="lflag segfull">Interamente</span>:(c==="partial"?<span className="lflag segpart">In parte</span>:<span className="lflag segout">Fuori</span>); const key=(k.ap||k.ch)?<span className="lflag segkey">{"\uD83D\uDD11 "}{k.ap&&k.ch?"apertura e chiusura":(k.ap?"apertura":"chiusura")}</span>:null; return <span>{badge}{key}</span>; })()}</td></tr>; })}</tbody>
   </table></div>
   <div className="totbar">
     <span className="totlbl">Totale ore per tipologia (filtro corrente):</span>
