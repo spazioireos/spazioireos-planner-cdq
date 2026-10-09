@@ -548,7 +548,10 @@ function App(){
   }
   function importAll(file){ const fr=new FileReader();
     fr.onload=()=>{ try{ const o=JSON.parse(fr.result); if(!o||!o.anni) throw 0;
-      if(!confirm("Importare il backup? Sostituir\u00E0 i dati attuali. Ricordati di premere Salva per confermare.")) return;
+      const vb=(typeof o.v==="number")?o.v:1;
+      if(vb>3){ alert("Questo backup \u00E8 stato creato con una versione pi\u00F9 recente dell'app (schema v"+vb+", qui v3). Aggiorna l'app prima di importarlo: import annullato."); return; }
+      if(vb<3 && !confirm("Attenzione: il backup usa uno schema pi\u00F9 vecchio (v"+vb+", attuale v3). Alcuni campi recenti potrebbero mancare. Importare comunque? Ricordati di premere Salva per confermare.")) return;
+      if(vb===3 && !confirm("Importare il backup? Sostituir\u00E0 i dati attuali. Ricordati di premere Salva per confermare.")) return;
       setAnni(o.anni||{}); setOccAll(o.occ||[]); setSegAll(o.seg||{}); pickDefault(o.anni||{}); markDirty();
     }catch(e){ alert("File non valido."); } };
     fr.readAsText(file);
@@ -840,7 +843,7 @@ function App(){
           <div className="field"><label>Inizio</label><select value={editing.start} onChange={ev=>{ const s=parseInt(ev.target.value,10); setEditing(Object.assign({},editing,{start:s,dur:Math.min(editing.dur,SLOTS-s)})); }}>{Array.apply(null,{length:SLOTS}).map((x,i)=> <option key={i} value={i}>{slotToTime(i)}</option>)}</select></div>
           <div className="field"><label>Durata</label><select value={editing.dur} onChange={ev=>setEditing(Object.assign({},editing,{dur:parseInt(ev.target.value,10)}))}>{Array.apply(null,{length:SLOTS-editing.start}).map((x,i)=> <option key={i} value={i+1}>{durLabel(i+1)}</option>)}</select></div>
         </div>
-        <div className="modal-actions">{editing.id && <button className="btn danger" onClick={()=>{ removeOcc(editing.id); setEditing(null); }}>Elimina</button>}{editing.id && <button className="btn" onClick={()=>{ setEditing(Object.assign({},editing,{id:null,cert:""})); setMErr(""); flash("Copia: scegli giorno/ora e Applica"); }}>Duplica</button>}<span className="grow"></span>
+        <div className="modal-actions">{editing.id && <button className="btn danger" onClick={()=>{ if(confirm("Eliminare questa occupazione? Ricordati di premere Salva per confermare.")){ removeOcc(editing.id); setEditing(null); } }}>Elimina</button>}{editing.id && <button className="btn" onClick={()=>{ setEditing(Object.assign({},editing,{id:null,cert:""})); setMErr(""); flash("Copia: scegli giorno/ora e Applica"); }}>Duplica</button>}<span className="grow"></span>
           <button className="btn ghost" onClick={()=>setEditing(null)}>Annulla</button><button className="btn primary" onClick={saveModal}>Applica</button></div>
       </div>}
     </div>
@@ -1069,7 +1072,7 @@ function exportExcel(rows){
   const payL={"":"","free":"Gratuito","paid":"A pagamento"}; const certL={"":"Da certificare","ok":"Tutto ok","chk":"Da verificare"};
   const data=rows.map(o=>({ "Sede":o.sede, "Aula":o.room, "Giorno":DAYS[o.day], "Dalle":slotToTime(o.start), "Alle":slotToTime(o.end), "Ore":(o.end-o.start)/4, "Tipo":typeOf(o.tipo).label, "Attivit\u00E0":o.att, "Disciplina":o.att2||"", "Insegnante":hasIns(o.tipo)?(o.ins||""):"", "Insegnante definito":hasIns(o.tipo)?(o.insDef?"S\u00EC":"Da definire"):"", "Periodicit\u00E0":perLabel(o.per,o.day)||"Ogni settimana", "Certificazione":certL[o.cert||""], "Riservato":o.ris?"S\u00EC":"", "A chi":o.ris?(o.risA||""):"", "Costo":payL[o.pay||""] }));
   const ws=XLSX.utils.json_to_sheet(data); ws["!cols"]=[{wch:14},{wch:16},{wch:9},{wch:7},{wch:7},{wch:6},{wch:22},{wch:26},{wch:18},{wch:16},{wch:14},{wch:9},{wch:20},{wch:14}];
-  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"Occupazioni");
+  const wb=XLSX.utils.book_new(); wb.Props={Author:"Christian Canonica",Company:"Spazio Ireos",Title:"Calendario CDQ",CreatedDate:new Date()}; XLSX.utils.book_append_sheet(wb,ws,"Occupazioni");
   XLSX.writeFile(wb, "Calendario CDQ Spazio Ireos - Elenco "+nowStamp()+".xlsx");
 }
 function ListView({occ,seg,sedeSel,aulaOn,giornoSet,certF,risF,payF,insF,segF,hitQT,canEdit,onBlock,onCert}){
