@@ -10,7 +10,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -1067,13 +1068,40 @@ function isStructured(tipo){ return tipo==="corso"||tipo==="altra"||tipo==="este
 function hasIns(tipo){ return tipo==="corso"||tipo==="sportello"; }
 function nowStamp(){ const d=new Date(); const p={}; (new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Rome',day:'2-digit',month:'short',year:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false})).formatToParts(d).forEach(x=>p[x.type]=x.value);
   const mesi={Jan:'gen',Feb:'feb',Mar:'mar',Apr:'apr',May:'mag',Jun:'giu',Jul:'lug',Aug:'ago',Sep:'set',Oct:'ott',Nov:'nov',Dec:'dic'}; return p.day+(mesi[p.month]||p.month.toLowerCase())+p.year+" - "+p.hour+"."+p.minute; }
+function xlFill(hex,f){ hex=(hex||"#CCCCCC").replace("#",""); function ch(i){ return parseInt(hex.substr(i,2),16); } function m(v){ var x=Math.round(v*f+255*(1-f)); if(x<0)x=0; if(x>255)x=255; var s=x.toString(16).toUpperCase(); return s.length<2?("0"+s):s; } return "FF"+m(ch(0))+m(ch(2))+m(ch(4)); }
+function xlCol(n){ var s=""; n=n+1; while(n>0){ var r=(n-1)%26; s=String.fromCharCode(65+r)+s; n=Math.floor((n-1)/26); } return s; }
+function xlDownload(blob,name){ var url=URL.createObjectURL(blob),a=document.createElement("a"); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); }
+function xlInjectA4(buf,cb){
+  if(typeof JSZip==="undefined"){ cb(null); return; }
+  JSZip.loadAsync(buf).then(function(zip){ var fl=zip.file("xl/worksheets/sheet1.xml"); if(!fl){ cb(null); return; }
+    fl.async("string").then(function(xml){
+      if(xml.indexOf("<pageSetUpPr")<0){
+        if(xml.indexOf("<sheetPr")>=0){ if(/<sheetPr\b[^>]*\/>/.test(xml)){ xml=xml.replace(/<sheetPr\b([^>]*)\/>/, '<sheetPr$1><pageSetUpPr fitToPage="1"/></sheetPr>'); } else { xml=xml.replace(/<\/sheetPr>/, '<pageSetUpPr fitToPage="1"/></sheetPr>'); } }
+        else { xml=xml.replace(/(<worksheet\b[^>]*>)/, '$1<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>'); }
+      }
+      if(xml.indexOf("<pageSetup")<0){
+        var setup='<pageSetup orientation="portrait" paperSize="9" fitToWidth="1" fitToHeight="0" scale="100"/>';
+        if(xml.indexOf("<pageMargins")>=0){ xml=xml.replace(/(<pageMargins[^>]*\/>)/, '$1'+setup); }
+        else { var margins='<pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/>'; var pos=xml.search(/<(ignoredErrors|tableParts|drawing|legacyDrawing|extLst|picture|oleObjects|controls)\b/); if(pos<0){ pos=xml.lastIndexOf("</worksheet>"); } xml=xml.slice(0,pos)+margins+setup+xml.slice(pos); }
+      }
+      zip.file("xl/worksheets/sheet1.xml", xml);
+      zip.generateAsync({type:"blob",mimeType:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}).then(function(blob){ cb(blob); });
+    });
+  }).catch(function(e){ cb(null); });
+}
 function exportExcel(rows){
   if(typeof XLSX==="undefined"){ alert("La libreria Excel non \u00E8 ancora pronta (o manca la connessione). Riprova tra un istante."); return; }
   const payL={"":"","free":"Gratuito","paid":"A pagamento"}; const certL={"":"Da certificare","ok":"Tutto ok","chk":"Da verificare"};
   const data=rows.map(o=>({ "Sede":o.sede, "Aula":o.room, "Giorno":DAYS[o.day], "Dalle":slotToTime(o.start), "Alle":slotToTime(o.end), "Ore":(o.end-o.start)/4, "Tipo":typeOf(o.tipo).label, "Attivit\u00E0":o.att, "Disciplina":o.att2||"", "Insegnante":hasIns(o.tipo)?(o.ins||""):"", "Insegnante definito":hasIns(o.tipo)?(o.insDef?"S\u00EC":"Da definire"):"", "Periodicit\u00E0":perLabel(o.per,o.day)||"Ogni settimana", "Certificazione":certL[o.cert||""], "Riservato":o.ris?"S\u00EC":"", "A chi":o.ris?(o.risA||""):"", "Costo":payL[o.pay||""] }));
   const ws=XLSX.utils.json_to_sheet(data); ws["!cols"]=[{wch:14},{wch:16},{wch:9},{wch:7},{wch:7},{wch:6},{wch:22},{wch:26},{wch:18},{wch:16},{wch:14},{wch:9},{wch:20},{wch:14}];
+  if(data.length>0){ const ncol=Object.keys(data[0]).length;
+    for(let i=0;i<rows.length;i++){ const fcol=xlFill(typeOf(rows[i].tipo).color,0.22); const rr=i+2;
+      for(let c=0;c<ncol;c++){ const a=xlCol(c)+rr; if(!ws[a]) ws[a]={t:"s",v:""}; ws[a].s={fill:{patternType:"solid",fgColor:{rgb:fcol}}}; } } }
   const wb=XLSX.utils.book_new(); wb.Props={Author:"Christian Canonica",Company:"Spazio Ireos",Title:"Calendario CDQ",CreatedDate:new Date()}; XLSX.utils.book_append_sheet(wb,ws,"Occupazioni");
-  XLSX.writeFile(wb, "Calendario CDQ Spazio Ireos - Elenco "+nowStamp()+".xlsx");
+  const name="Calendario CDQ Spazio Ireos - Elenco "+nowStamp()+".xlsx";
+  try{ const buf=XLSX.write(wb,{bookType:"xlsx",type:"array"});
+    xlInjectA4(buf,function(blob){ if(blob){ xlDownload(blob,name); } else { xlDownload(new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),name); alert("Excel creato con i colori. Impostazione di stampa A4 non applicata (libreria JSZip non caricata): in Excel usa Layout di pagina \u2192 Adatta: 1 pagina in larghezza."); } });
+  }catch(e){ alert("Errore nella creazione dell'Excel: "+((e&&e.message)?e.message:e)); }
 }
 function ListView({occ,seg,sedeSel,aulaOn,giornoSet,certF,risF,payF,insF,segF,hitQT,canEdit,onBlock,onCert}){
   function segBands(o){ const arr=(seg&&seg[o.sede])?seg[o.sede]:[]; return arr.filter(function(x){return x.day===o.day;}); }
